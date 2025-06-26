@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - logicalFilePath: db/changelog/master.yaml
+
+  - includeAll:
+      path: "scripts/2025"
+      relativeToChangelogFile: true
+      errorIfMissingOrEmpty: true

@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: 'postgis/postgis:17-3.5'
+    environment:
+      - 'POSTGRES_DB=obstanovka'
+      - 'POSTGRES_PASSWORD=postgres'
+      - 'POSTGRES_USER=postgres'
+    ports:
+      - '5432:5432'

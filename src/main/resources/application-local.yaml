@@ -1,0 +1,16 @@
+spring:
+  security:
+    user:
+      name: admin
+      password: admin123
+  datasource:
+    url: jdbc:postgresql://localhost:5432/obstanovka
+    username: postgres
+    password: postgres
+    hikari:
+      max-lifetime: 1800000
+
+
+app:
+  file-storage:
+    path: files
