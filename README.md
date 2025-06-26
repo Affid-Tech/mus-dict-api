@@ -1,1 +1,1 @@
-# mus-dict
+# mus-dict-api
