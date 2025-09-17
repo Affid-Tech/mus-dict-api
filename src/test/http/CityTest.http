@@ -1,0 +1,75 @@
+### Create City
+# @name createCity
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Luxembourg"
+}
+
+> {%
+    client.test("Create City -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = JSON.parse(response.body);
+        client.assert(!!data.id, "City id present");
+        client.assert(data.name === "Luxembourg", "Name ok");
+    });
+    const c = JSON.parse(response.body);
+    client.global.set("city_id", c.id);
+%}
+
+### Get City
+# @name getCity
+GET {{baseUrl}}/api/v1/cities/{{city_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Get City -> 200 & same id", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = JSON.parse(response.body);
+        client.assert(data.id === client.global.get("city_id"), "IDs match");
+    });
+%}
+
+### List Cities (q filter)
+# @name listCities
+GET {{baseUrl}}/api/v1/cities?q=Lux&page=0&size=10
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("List Cities -> 200 & array", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const arr = JSON.parse(response.body);
+        client.assert(Array.isArray(arr), "Array expected");
+    });
+%}
+
+### Update City
+# @name updateCity
+PATCH {{baseUrl}}/api/v1/cities/{{city_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Luxembourg City"
+}
+
+> {%
+    client.test("Update City -> 200 & new name", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = JSON.parse(response.body);
+        client.assert(data.name === "Luxembourg City", "Updated");
+    });
+%}
+
+### Delete City (may be 409 if referenced)
+# @name deleteCity
+DELETE {{baseUrl}}/api/v1/cities/{{city_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete City -> 204 or conflict", () => {
+        client.assert([204,409].includes(response.status), "Expected 204 or 409 if referenced");
+    });
+%}

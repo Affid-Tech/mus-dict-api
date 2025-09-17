@@ -5,9 +5,9 @@ import java.time.LocalTime
 import java.util.*
 
 data class OpeningHoursCreateDTO(
-	val dayOfWeek: DayOfWeek, // 0 = Monday
-	val openTime: LocalTime,  // "HH:mm"
-	val closeTime: LocalTime  // "HH:mm"
+	val dayOfWeek: DayOfWeek,
+	val openTime: LocalTime,
+	val closeTime: LocalTime
 )
 
 data class OpeningHoursUpdateDTO(

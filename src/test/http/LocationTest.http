@@ -1,0 +1,220 @@
+### Create City (to use in Address)
+# @name createCity
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Luxembourg"
+}
+
+> {%
+    client.test("Create City -> 201 & has id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = JSON.parse(response.body);
+        client.assert(!!data.id, "City id is present");
+    });
+    const city = JSON.parse(response.body);
+    client.global.set("city_id", city.id);
+%}
+
+### Prepare: Create base Address to reference
+# @name createBaseAddress
+POST {{baseUrl}}/api/v1/addresses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{city_id}}",
+  "readableAddress": "12 Rue de la Gare, 1611 Luxembourg",
+  "coordinates": { "lat": 49.6117, "lon": 6.1319 }
+}
+
+> {%
+    // capture
+    client.test("Create base address -> 201", () => client.assert(response.status === 201, "Expected 201"));
+    const a = JSON.parse(response.body);
+    client.global.set("addressId", a.id);
+%}
+
+### Create Location using existing addressId
+# @name createLocationWithAddressId
+POST {{baseUrl}}/api/v1/locations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Studio A",
+  "cover": null,
+  "addressId": "{{addressId}}",
+  "description": "Ground floor rehearsal room",
+  "contacts": "contact@studio-a.example"
+}
+
+> {%
+    client.test("Create Location -> 201 & has types", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = JSON.parse(response.body);
+        client.assert(!!data.id, "Location id present");
+        client.assert(Array.isArray(data.types) && data.types.length >= 1, "types present");
+        client.assert(data.address.id === client.global.get("addressId"), "Linked to base address");
+    });
+    const loc = JSON.parse(response.body);
+    client.global.set("locationId", loc.id);
+%}
+
+### Get Location by ID
+# @name getLocation
+GET {{baseUrl}}/api/v1/locations/{{locationId}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Get Location -> 200 & name ok", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = JSON.parse(response.body);
+        client.assert(data.name === "Studio A", "Name preserved");
+    });
+%}
+
+### List Locations (city filter & near)
+# @name listLocations
+GET {{baseUrl}}/api/v1/locations?cityId=c1a2b3c4-d5e6-7890-1234-abcdefabcdef&nearLat=49.6117&nearLon=6.1319&radiusMeters=1000&page=0&size=20
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("List Locations -> 200 & array", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const arr = JSON.parse(response.body);
+        client.assert(Array.isArray(arr), "Expected array");
+    });
+%}
+
+### Update Location -> copy-on-write (addressCreate)
+# @name updateLocationCopyOnWrite
+PATCH {{baseUrl}}/api/v1/locations/{{locationId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Studio A (Moved)",
+  "addressCreate": {
+    "cityId": "c1a2b3c4-d5e6-7890-1234-abcdefabcdef",
+    "readableAddress": "10 Place d'Armes, 1136 Luxembourg",
+    "coordinates": { "lat": 49.6112, "lon": 6.1319 }
+  }
+}
+
+> {%
+    client.test("Update (copy-on-write) -> 200 & moved address", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = JSON.parse(response.body);
+        client.assert(data.name === "Studio A (Moved)", "Name updated");
+        client.assert(!!data.address && !!data.address.id, "New address present");
+        client.assert(data.address.readableAddress === "10 Place d'Armes, 1136 Luxembourg", "Moved address ok");
+    });
+    const moved = JSON.parse(response.body);
+    client.global.set("newAddressId", moved.address.id);
+%}
+
+### Negative: both addressId & addressCreate on create -> 400
+# @name createLocationInvalidBoth
+POST {{baseUrl}}/api/v1/locations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Invalid Both",
+  "addressId": "{{addressId}}",
+  "addressCreate": {
+    "readableAddress": "Should fail",
+    "coordinates": { "lat": 0.0, "lon": 0.0 }
+  }
+}
+
+> {%
+    client.test("Create Location with both sources -> 400", () => {
+        client.assert(response.status === 400, "Expected 400");
+    });
+%}
+
+### Negative: both addressId & addressCreate on update -> 400
+# @name updateLocationInvalidBoth
+PATCH {{baseUrl}}/api/v1/locations/{{locationId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "addressId": "{{addressId}}",
+  "addressCreate": {
+    "readableAddress": "Also fail",
+    "coordinates": { "lat": 0.0, "lon": 0.0 }
+  }
+}
+
+> {%
+    client.test("Update Location with both sources -> 400", () => {
+        client.assert(response.status === 400, "Expected 400");
+    });
+%}
+
+### Try to delete the base Address (still referenced by someone?) -> expect conflict
+# @name deleteBaseAddressConflict
+DELETE {{baseUrl}}/api/v1/addresses/{{addressId}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete Address in use -> conflict", () => {
+        client.assert([409, 400, 422].includes(response.status), "Expected conflict (e.g., 409)");
+    });
+%}
+
+### Repoint Location back to original address
+# @name updateLocationRepoint
+PATCH {{baseUrl}}/api/v1/locations/{{locationId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "addressId": "{{addressId}}"
+}
+
+> {%
+    client.test("Repoint Location -> 200 & address restored", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = JSON.parse(response.body);
+        client.assert(data.address.id === client.global.get("addressId"), "Repointed to original");
+    });
+%}
+
+### Cleanup: Delete Location
+# @name deleteLocation
+DELETE {{baseUrl}}/api/v1/locations/{{locationId}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete Location -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### Cleanup: Delete new (cloned) Address (should succeed)
+# @name deleteNewAddress
+DELETE {{baseUrl}}/api/v1/addresses/{{newAddressId}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete new cloned Address -> 204", () => {
+        client.assert([204, 404].includes(response.status), "Expected 204 (or 404 if already gone)");
+    });
+%}
+
+### Optional: Delete original Address (if no longer referenced)
+# @name deleteOriginalAddress
+DELETE {{baseUrl}}/api/v1/addresses/{{addressId}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete original Address -> ok", () => {
+        client.assert([204, 409, 404].includes(response.status), "Expected 204 (or 409/404 depending on state)");
+    });
+%}

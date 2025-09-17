@@ -4,14 +4,14 @@ import java.util.*
 
 data class EquipmentCreateDTO(
 	val name: String,
-	val cover: String?,
-	val description: String?
+	val cover: String? = null,
+	val description: String? = null
 )
 
 data class EquipmentUpdateDTO(
-	val name: String?,
-	val cover: String?,
-	val description: String?
+	val name: String? = null,
+	val cover: String? = null,
+	val description: String? = null
 )
 
 data class EquipmentReadDTO(

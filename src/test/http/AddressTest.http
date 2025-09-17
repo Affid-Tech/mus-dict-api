@@ -1,0 +1,91 @@
+### Create City (to use in Address)
+# @name createCity
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Luxembourg"
+}
+
+> {%
+    client.test("Create City -> 201 & has id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = JSON.parse(response.body);
+        client.assert(!!data.id, "City id is present");
+    });
+    const city = JSON.parse(response.body);
+    client.global.set("city_id", city.id);
+%}
+
+### Create Address (using created City)
+# @name createAddress
+POST {{baseUrl}}/api/v1/addresses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{city_id}}",
+  "readableAddress": "12 Rue de la Gare, 1611 Luxembourg",
+  "coordinates": { "lat": 49.6117, "lon": 6.1319 }
+}
+
+> {%
+    // Assert + capture
+    client.test("Create Address -> 201 & has id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = JSON.parse(response.body);
+        client.assert(!!data.id, "id is present");
+        client.assert(data.readableAddress === "12 Rue de la Gare, 1611 Luxembourg", "readableAddress ok");
+    });
+    const addr = JSON.parse(response.body);
+    client.global.set("addr_id", addr.id);
+%}
+
+### Get Address by ID
+# @name getAddress
+GET {{baseUrl}}/api/v1/addresses/{{addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Get Address -> 200 & same id", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = JSON.parse(response.body);
+        client.assert(data.id === client.global.get("addr_id"), "IDs match");
+    });
+%}
+
+### List Addresses (search & paging)
+# @name listAddresses
+GET {{baseUrl}}/api/v1/addresses?q=Gare&page=0&size=10
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("List Addresses -> 200 & array", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const arr = JSON.parse(response.body);
+        client.assert(Array.isArray(arr), "Expected array");
+    });
+%}
+
+### Delete Address
+# @name deleteAddress
+DELETE {{baseUrl}}/api/v1/addresses/{{addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete Address -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### Verify Address deleted (optional)
+# @name getDeletedAddress
+GET {{baseUrl}}/api/v1/addresses/{{addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Get Deleted Address -> 404", () => {
+        client.assert([404, 410].includes(response.status), "Expected 404/410");
+    });
+%}
