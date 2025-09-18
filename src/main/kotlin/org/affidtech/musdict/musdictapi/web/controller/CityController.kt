@@ -6,6 +6,7 @@ import org.affidtech.musdict.musdictapi.web.dto.CityCreate
 import org.affidtech.musdict.musdictapi.web.dto.CityReadDetail
 import org.affidtech.musdict.musdictapi.web.dto.CityReadSummary
 import org.affidtech.musdict.musdictapi.web.dto.CityUpdate
+import org.springframework.data.domain.Page
 import org.springframework.http.HttpStatus
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
@@ -28,7 +29,7 @@ class CityController(
 		@RequestParam(defaultValue = "0") page: Int,
 		@RequestParam(defaultValue = "50") size: Int,
 		@RequestParam(required = false) q: String?
-	): List<CityReadSummary> =
+	): Page<CityReadSummary> =
 		cityService.list(page = page, size = size, q = q)
 	
 	@GetMapping("/{id}")

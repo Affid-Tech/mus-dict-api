@@ -11,11 +11,11 @@ Content-Type: application/json
 > {%
     client.test("Create City -> 201 & id", () => {
         client.assert(response.status === 201, "Expected 201");
-        const data = JSON.parse(response.body);
+        const data = response.body;
         client.assert(!!data.id, "City id present");
         client.assert(data.name === "Luxembourg", "Name ok");
     });
-    const c = JSON.parse(response.body);
+    const c = response.body;
     client.global.set("city_id", c.id);
 %}
 
@@ -27,7 +27,7 @@ Authorization: Bearer {{token}}
 > {%
     client.test("Get City -> 200 & same id", () => {
         client.assert(response.status === 200, "Expected 200");
-        const data = JSON.parse(response.body);
+        const data = response.body;
         client.assert(data.id === client.global.get("city_id"), "IDs match");
     });
 %}
@@ -38,10 +38,12 @@ GET {{baseUrl}}/api/v1/cities?q=Lux&page=0&size=10
 Authorization: Bearer {{token}}
 
 > {%
-    client.test("List Cities -> 200 & array", () => {
+    client.test("List Cities -> 200 & page", () => {
         client.assert(response.status === 200, "Expected 200");
-        const arr = JSON.parse(response.body);
-        client.assert(Array.isArray(arr), "Array expected");
+        const data = response.body;
+        client.assert(data.totalElements === 1, "Expected 1 element on page")
+        client.assert(data.content[0].name === "Luxembourg", "Name ok")
+        client.assert(data.content[0].id === client.global.get("city_id"), "ID ok")
     });
 %}
 
@@ -58,7 +60,7 @@ Content-Type: application/json
 > {%
     client.test("Update City -> 200 & new name", () => {
         client.assert(response.status === 200, "Expected 200");
-        const data = JSON.parse(response.body);
+        const data = response.body;
         client.assert(data.name === "Luxembourg City", "Updated");
     });
 %}

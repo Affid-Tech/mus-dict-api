@@ -13,5 +13,5 @@ data class City(
 	val id: UUID,
 	
 	@Column(nullable = false)
-	val name: String
+	var name: String
 )
