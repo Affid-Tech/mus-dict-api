@@ -34,7 +34,6 @@ class CityService(
 		// We construct the entity here to control ID generation,
 		// then let MapStruct handle the DTO mapping.
 		val entity = City(
-			id = UUID.randomUUID(),
 			name = dto.name.trim()
 		)
 		

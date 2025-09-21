@@ -8,15 +8,16 @@ import java.util.*
 @Table(name = "address")
 data class Address(
 	@Id
-	val id: UUID,
+	@GeneratedValue
+	var id: UUID? = null,
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "city_id")
-	val city: City? = null,
+	var city: City? = null,
 	
 	@Column(columnDefinition = "geography(Point,4326)")
-	val coordinates: Point? = null,
+	var coordinates: Point? = null,
 	
 	@Column(name = "readable_address")
-	val readableAddress: String? = null
+	var readableAddress: String? = null
 )

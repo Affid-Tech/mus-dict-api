@@ -8,7 +8,8 @@ import java.util.*
 @Inheritance(strategy = InheritanceType.JOINED)
 class Location(
 	@Id
-	val id: UUID,
+	@GeneratedValue
+	val id: UUID? = null,
 	
 	@Column(nullable = false)
 	val name: String,

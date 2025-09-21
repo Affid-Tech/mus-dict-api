@@ -43,6 +43,8 @@ data class AddressCreate(
 	val readableAddress: String? = null
 )
 
+typealias AddressUpdate = AddressCreate
+
 data class CoordinatesDto(
 	@field:NotNull
 	@field:DecimalMin(value = "-90.0", inclusive = true)

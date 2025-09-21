@@ -9,12 +9,15 @@ Content-Type: application/json
 }
 
 > {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
     client.test("Create City -> 201 & has id", () => {
         client.assert(response.status === 201, "Expected 201");
-        const data = JSON.parse(response.body);
+        const data = safeJson(response.body);
         client.assert(!!data.id, "City id is present");
+        client.assert(data.name === "Luxembourg", "City name ok");
     });
-    const city = JSON.parse(response.body);
+    const city = safeJson(response.body);
     client.global.set("city_id", city.id);
 %}
 
@@ -31,14 +34,17 @@ Content-Type: application/json
 }
 
 > {%
-    // Assert + capture
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
     client.test("Create Address -> 201 & has id", () => {
         client.assert(response.status === 201, "Expected 201");
-        const data = JSON.parse(response.body);
+        const data = safeJson(response.body);
         client.assert(!!data.id, "id is present");
         client.assert(data.readableAddress === "12 Rue de la Gare, 1611 Luxembourg", "readableAddress ok");
+        client.assert(!!data.city && data.city.id === client.global.get("city_id"), "City linked");
+        client.assert(!!data.coordinates, "Coordinates present");
     });
-    const addr = JSON.parse(response.body);
+    const addr = safeJson(response.body);
     client.global.set("addr_id", addr.id);
 %}
 
@@ -48,9 +54,11 @@ GET {{baseUrl}}/api/v1/addresses/{{addr_id}}
 Authorization: Bearer {{token}}
 
 > {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
     client.test("Get Address -> 200 & same id", () => {
         client.assert(response.status === 200, "Expected 200");
-        const data = JSON.parse(response.body);
+        const data = safeJson(response.body);
         client.assert(data.id === client.global.get("addr_id"), "IDs match");
     });
 %}
@@ -61,10 +69,130 @@ GET {{baseUrl}}/api/v1/addresses?q=Gare&page=0&size=10
 Authorization: Bearer {{token}}
 
 > {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
     client.test("List Addresses -> 200 & array", () => {
         client.assert(response.status === 200, "Expected 200");
-        const arr = JSON.parse(response.body);
+        const arr = safeJson(response.body);
         client.assert(Array.isArray(arr), "Expected array");
+        client.assert(arr.length >= 1, "At least one address found");
+    });
+%}
+
+### Create Second City (to test city change on update)
+# @name createCity2
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Esch-sur-Alzette"
+}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
+    client.test("Create City #2 -> 201 & has id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = safeJson(response.body);
+        client.assert(!!data.id, "City #2 id is present");
+        client.assert(data.name === "Esch-sur-Alzette", "City #2 name ok");
+    });
+    const city2 = safeJson(response.body);
+    client.global.set("city2_id", city2.id);
+%}
+
+### Update Address (readableAddress + coordinates only)
+# @name updateAddress_fields
+PATCH {{baseUrl}}/api/v1/addresses/{{addr_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{city_id}}",
+  "readableAddress": "14 Rue de la Gare, 1611 Luxembourg",
+  "coordinates": { "lat": 49.6120, "lon": 6.1325 }
+}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
+    client.test("Update Address (fields) -> 200 & values changed", () => {
+        client.assert([200, 204].includes(response.status), "Expected 200/204");
+    });
+%}
+
+### Verify Updated Address (fields)
+# @name getAddress_afterFieldUpdate
+GET {{baseUrl}}/api/v1/addresses/{{addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
+    client.test("Verify Update (fields) -> values match", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = safeJson(response.body);
+        client.assert(data.readableAddress === "14 Rue de la Gare, 1611 Luxembourg", "readableAddress updated");
+
+        // coordinates tolerance check (floating point)
+        const latOk = Math.abs(Number(data.coordinates.lat) - 49.6120) < 1e-6;
+        const lonOk = Math.abs(Number(data.coordinates.lon) - 6.1325) < 1e-6;
+        client.assert(latOk && lonOk, "coordinates updated");
+    });
+%}
+
+### Update Address (switch to second City)
+# @name updateAddress_city
+PATCH {{baseUrl}}/api/v1/addresses/{{addr_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{city2_id}}",
+  "readableAddress": "14 Rue de la Gare, 1611 Luxembourg",
+  "coordinates": { "lat": 49.6120, "lon": 6.1325 }
+}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
+    client.test("Update Address (city change) -> 200", () => {
+        client.assert([200, 204].includes(response.status), "Expected 200/204");
+    });
+%}
+
+### Verify Updated Address (city changed)
+# @name getAddress_afterCityUpdate
+GET {{baseUrl}}/api/v1/addresses/{{addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
+    client.test("Verify Update (city) -> city changed", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = safeJson(response.body);
+        client.assert(!!data.city, "City present");
+        client.assert(data.city.id === client.global.get("city2_id"), "City switched to City #2");
+    });
+%}
+
+### Negative: Update non-existent Address -> 404
+# @name updateAddress_notFound
+PATCH {{baseUrl}}/api/v1/addresses/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{city_id}}",
+  "readableAddress": "Ghost Street, 0000",
+  "coordinates": { "lat": 0.0, "lon": 0.0 }
+}
+
+> {%
+    client.test("Update non-existent -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
     });
 %}
 
@@ -87,5 +215,27 @@ Authorization: Bearer {{token}}
 > {%
     client.test("Get Deleted Address -> 404", () => {
         client.assert([404, 410].includes(response.status), "Expected 404/410");
+    });
+%}
+
+### Delete City 1 (may be 409 if referenced)
+# @name deleteCity
+DELETE {{baseUrl}}/api/v1/cities/{{city_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete City -> 204 or conflict", () => {
+        client.assert([204,409].includes(response.status), "Expected 204 or 409 if referenced");
+    });
+%}
+
+### Delete City 1 (may be 409 if referenced)
+# @name deleteCity
+DELETE {{baseUrl}}/api/v1/cities/{{city2_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete City -> 204 or conflict", () => {
+        client.assert([204,409].includes(response.status), "Expected 204 or 409 if referenced");
     });
 %}

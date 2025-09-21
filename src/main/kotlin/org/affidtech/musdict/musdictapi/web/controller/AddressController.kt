@@ -5,6 +5,7 @@ import org.affidtech.musdict.musdictapi.service.AddressService
 import org.affidtech.musdict.musdictapi.web.dto.AddressCreate
 import org.affidtech.musdict.musdictapi.web.dto.AddressReadDetail
 import org.affidtech.musdict.musdictapi.web.dto.AddressReadSummary
+import org.affidtech.musdict.musdictapi.web.dto.AddressUpdate
 import org.springframework.http.HttpStatus
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
@@ -22,6 +23,10 @@ class AddressController(
 	@ResponseStatus(HttpStatus.CREATED)
 	fun create(@RequestBody @Valid body: AddressCreate): AddressReadDetail =
 		addressService.create(body)
+	
+	@PatchMapping("/{id}")
+	fun update(@PathVariable id: UUID, @RequestBody @Valid body: AddressUpdate): AddressReadDetail =
+		addressService.update(id, body)
 	
 	@GetMapping
 	fun list(

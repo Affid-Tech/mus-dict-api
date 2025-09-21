@@ -9,7 +9,8 @@ import java.util.*
 @Table(name = "opening_hours")
 data class OpeningHours(
 	@Id
-	val id: UUID,
+	@GeneratedValue
+	val id: UUID? = null,
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "location_id")
