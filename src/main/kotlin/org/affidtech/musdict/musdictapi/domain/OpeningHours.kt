@@ -10,7 +10,7 @@ import java.util.*
 data class OpeningHours(
 	@Id
 	@GeneratedValue
-	val id: UUID? = null,
+	var id: UUID? = null,
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "location_id")

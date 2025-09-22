@@ -6,6 +6,7 @@ import org.affidtech.musdict.musdictapi.web.dto.LocationCreate
 import org.affidtech.musdict.musdictapi.web.dto.LocationReadDetail
 import org.affidtech.musdict.musdictapi.web.dto.LocationReadSummary
 import org.affidtech.musdict.musdictapi.web.dto.LocationUpdate
+import org.springframework.data.domain.Page
 import org.springframework.http.HttpStatus
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
@@ -35,7 +36,7 @@ class LocationController(
 		@RequestParam(defaultValue = "0") page: Int,
 		@RequestParam(defaultValue = "20") size: Int,
 		@RequestParam(required = false) sort: String?
-	): List<LocationReadSummary> =
+	): Page<LocationReadSummary> =
 		locationService.list(
 			cityId = cityId,
 			q = q,

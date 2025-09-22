@@ -6,6 +6,7 @@ import org.affidtech.musdict.musdictapi.web.dto.AddressCreate
 import org.affidtech.musdict.musdictapi.web.dto.AddressReadDetail
 import org.affidtech.musdict.musdictapi.web.dto.AddressReadSummary
 import org.affidtech.musdict.musdictapi.web.dto.AddressUpdate
+import org.springframework.data.domain.Page
 import org.springframework.http.HttpStatus
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
@@ -38,7 +39,7 @@ class AddressController(
 		@RequestParam(defaultValue = "0") page: Int,
 		@RequestParam(defaultValue = "20") size: Int,
 		@RequestParam(required = false) sort: String?
-	): List<AddressReadSummary> =
+	): Page<AddressReadSummary> =
 		addressService.list(
 			cityId = cityId,
 			q = q,

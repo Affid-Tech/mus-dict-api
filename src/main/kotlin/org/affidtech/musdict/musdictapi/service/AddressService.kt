@@ -9,6 +9,7 @@ import org.affidtech.musdict.musdictapi.web.dto.AddressReadDetail
 import org.affidtech.musdict.musdictapi.web.dto.AddressReadSummary
 import org.affidtech.musdict.musdictapi.web.dto.AddressUpdate
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
@@ -51,7 +52,7 @@ class AddressService(
 		page: Int,
 		size: Int,
 		sort: String?
-	): List<AddressReadSummary> {
+	): Page<AddressReadSummary> {
 		val pageable = toPageable(page, size, sort)
 		val spec: Specification<org.affidtech.musdict.musdictapi.domain.Address> =
 			AddressSpecifications.and(
@@ -59,7 +60,7 @@ class AddressService(
 				AddressSpecifications.qLike(q),
 				AddressSpecifications.withinDistance(nearLat, nearLon, radiusMeters)
 			)
-		return addressRepository.findAll(spec, pageable).content.map { mapper.toReadSummary(it) }
+		return addressRepository.findAll(spec, pageable).map { mapper.toReadSummary(it) }
 	}
 	
 	@Transactional(readOnly = true)
@@ -91,8 +92,9 @@ class AddressService(
 		mapper.updateEntityFromDto(dto, entity)
 		entity.city = city ?: entity.city
 		
-		// No need to call save() explicitly — entity is managed
-		return mapper.toReadDetail(entity)
+		val saved = addressRepository.save(entity)
+		
+		return mapper.toReadDetail(saved)
 	}
 	
 	@Transactional

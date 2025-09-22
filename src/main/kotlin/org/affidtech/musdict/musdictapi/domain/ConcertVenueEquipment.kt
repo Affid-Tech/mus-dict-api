@@ -8,7 +8,7 @@ import java.util.*
 data class ConcertVenueEquipment(
 	@Id
 	@GeneratedValue
-	val id: UUID? = null,
+	var id: UUID? = null,
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "venue_id", nullable = false)

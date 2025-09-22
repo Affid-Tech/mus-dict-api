@@ -9,17 +9,17 @@ import java.util.*
 class Location(
 	@Id
 	@GeneratedValue
-	val id: UUID? = null,
+	var id: UUID? = null,
 	
 	@Column(nullable = false)
-	val name: String,
+	var name: String,
 	
-	val cover: String? = null,
+	var cover: String? = null,
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "address_id", nullable = false)
-	val address: Address,
+	var address: Address,
 	
-	val description: String? = null,
-	val contacts: String? = null
+	var description: String? = null,
+	var contacts: String? = null
 )

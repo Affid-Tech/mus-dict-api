@@ -12,7 +12,7 @@ import java.util.*
 data class Equipment(
 	@Id
 	@GeneratedValue
-	val id: UUID? = null,
+	var id: UUID? = null,
 	
 	@Column(nullable = false)
 	val name: String,

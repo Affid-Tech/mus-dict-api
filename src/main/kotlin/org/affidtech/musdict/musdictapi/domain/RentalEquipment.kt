@@ -8,7 +8,7 @@ import java.util.*
 data class RentalEquipment(
 	@Id
 	@GeneratedValue
-	val id: UUID? = null,
+	var id: UUID? = null,
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "rental_id", nullable = false)

@@ -73,7 +73,7 @@ Authorization: Bearer {{token}}
 
     client.test("List Addresses -> 200 & array", () => {
         client.assert(response.status === 200, "Expected 200");
-        const arr = safeJson(response.body);
+        const arr = safeJson(response.body).content;
         client.assert(Array.isArray(arr), "Expected array");
         client.assert(arr.length >= 1, "At least one address found");
     });
@@ -89,7 +89,7 @@ Authorization: Bearer {{token}}
 
     client.test("List Addresses -> 200 & array", () => {
         client.assert(response.status === 200, "Expected 200");
-        const arr = safeJson(response.body);
+        const arr = safeJson(response.body).content;
         client.assert(Array.isArray(arr), "Expected array");
         client.assert(arr.length >= 1, "At least one address found");
     });

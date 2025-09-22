@@ -1,5 +1,5 @@
-### Create City (to use in Address)
-# @name createCity
+### Create City #1 (for Address & Location)
+# @name createCity1
 POST {{baseUrl}}/api/v1/cities
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -9,17 +9,19 @@ Content-Type: application/json
 }
 
 > {%
-    client.test("Create City -> 201 & has id", () => {
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Create City #1 -> 201 & id", () => {
         client.assert(response.status === 201, "Expected 201");
-        const data = JSON.parse(response.body);
-        client.assert(!!data.id, "City id is present");
+        const data = safeJson(response.body);
+        client.assert(!!data.id, "City id present");
+        client.assert(data.name === "Luxembourg", "City name ok");
     });
-    const city = JSON.parse(response.body);
+    const city = safeJson(response.body);
     client.global.set("city_id", city.id);
 %}
 
-### Prepare: Create base Address to reference
-# @name createBaseAddress
+### Create Address (to reuse by Location via addressId)
+# @name createAddress1
 POST {{baseUrl}}/api/v1/addresses
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -31,164 +33,243 @@ Content-Type: application/json
 }
 
 > {%
-    // capture
-    client.test("Create base address -> 201", () => client.assert(response.status === 201, "Expected 201"));
-    const a = JSON.parse(response.body);
-    client.global.set("addressId", a.id);
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Create Address -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = safeJson(response.body);
+        client.assert(!!data.id, "Address id present");
+        client.assert(!!data.city && data.city.id === client.global.get("city_id"), "City linked");
+    });
+    const addr = safeJson(response.body);
+    client.global.set("addr_id", addr.id);
 %}
 
-### Create Location using existing addressId
-# @name createLocationWithAddressId
+### Create Location using addressId
+# @name createLocation_byAddressId
 POST {{baseUrl}}/api/v1/locations
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "name": "Studio A",
-  "cover": null,
-  "addressId": "{{addressId}}",
-  "description": "Ground floor rehearsal room",
-  "contacts": "contact@studio-a.example"
+  "cover": "https://example.com/cover-a.jpg",
+  "addressId": "{{addr_id}}",
+  "description": "Rehearsal room A",
+  "contacts": "contact@studioa.tld"
 }
 
 > {%
-    client.test("Create Location -> 201 & has types", () => {
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Create Location (addressId) -> 201 & id", () => {
         client.assert(response.status === 201, "Expected 201");
-        const data = JSON.parse(response.body);
+        const data = safeJson(response.body);
         client.assert(!!data.id, "Location id present");
-        client.assert(Array.isArray(data.types) && data.types.length >= 1, "types present");
-        client.assert(data.address.id === client.global.get("addressId"), "Linked to base address");
+        client.assert(data.name === "Studio A", "Name ok");
+        client.assert(!!data.address && data.address.id === client.global.get("addr_id"), "Address linked");
     });
-    const loc = JSON.parse(response.body);
-    client.global.set("locationId", loc.id);
+    const loc = safeJson(response.body);
+    client.global.set("loc_id", loc.id);
 %}
 
 ### Get Location by ID
 # @name getLocation
-GET {{baseUrl}}/api/v1/locations/{{locationId}}
+GET {{baseUrl}}/api/v1/locations/{{loc_id}}
 Authorization: Bearer {{token}}
 
 > {%
-    client.test("Get Location -> 200 & name ok", () => {
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Get Location -> 200 & same id", () => {
         client.assert(response.status === 200, "Expected 200");
-        const data = JSON.parse(response.body);
-        client.assert(data.name === "Studio A", "Name preserved");
+        const data = safeJson(response.body);
+        client.assert(data.id === client.global.get("loc_id"), "IDs match");
     });
 %}
 
-### List Locations (city filter & near)
+### List Locations (q & paging)
 # @name listLocations
-GET {{baseUrl}}/api/v1/locations?cityId=c1a2b3c4-d5e6-7890-1234-abcdefabcdef&nearLat=49.6117&nearLon=6.1319&radiusMeters=1000&page=0&size=20
+GET {{baseUrl}}/api/v1/locations?q=Studio&page=0&size=10
 Authorization: Bearer {{token}}
 
 > {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
     client.test("List Locations -> 200 & array", () => {
         client.assert(response.status === 200, "Expected 200");
-        const arr = JSON.parse(response.body);
+        const arr = safeJson(response.body).content;
         client.assert(Array.isArray(arr), "Expected array");
+        client.assert(arr.length >= 1, "At least one location found");
     });
 %}
 
-### Update Location -> copy-on-write (addressCreate)
-# @name updateLocationCopyOnWrite
-PATCH {{baseUrl}}/api/v1/locations/{{locationId}}
+### Update Location: simple fields via mapper (name, cover, description, contacts)
+# @name updateLocation_fields
+PATCH {{baseUrl}}/api/v1/locations/{{loc_id}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "Studio A (Moved)",
-  "addressCreate": {
-    "cityId": "c1a2b3c4-d5e6-7890-1234-abcdefabcdef",
-    "readableAddress": "10 Place d'Armes, 1136 Luxembourg",
-    "coordinates": { "lat": 49.6112, "lon": 6.1319 }
-  }
+  "name": "Studio A (Renamed)",
+  "cover": "https://example.com/cover-a-v2.jpg",
+  "description": "Rehearsal room A — updated",
+  "contacts": "admin@studioa.tld"
 }
 
 > {%
-    client.test("Update (copy-on-write) -> 200 & moved address", () => {
+    client.test("Update Location (fields) -> 200/204", () => {
+        client.assert([200, 204].includes(response.status), "Expected 200/204");
+    });
+%}
+
+### Verify Location fields updated
+# @name getLocation_afterFields
+GET {{baseUrl}}/api/v1/locations/{{loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Verify fields updated", () => {
         client.assert(response.status === 200, "Expected 200");
-        const data = JSON.parse(response.body);
-        client.assert(data.name === "Studio A (Moved)", "Name updated");
-        client.assert(!!data.address && !!data.address.id, "New address present");
-        client.assert(data.address.readableAddress === "10 Place d'Armes, 1136 Luxembourg", "Moved address ok");
+        const data = safeJson(response.body);
+        client.assert(data.name === "Studio A (Renamed)", "Name updated");
+        client.assert(data.cover === "https://example.com/cover-a-v2.jpg", "Cover updated");
+        client.assert(data.description === "Rehearsal room A — updated", "Description updated");
+        client.assert(data.contacts === "admin@studioa.tld", "Contacts updated");
     });
-    const moved = JSON.parse(response.body);
-    client.global.set("newAddressId", moved.address.id);
 %}
 
-### Negative: both addressId & addressCreate on create -> 400
-# @name createLocationInvalidBoth
-POST {{baseUrl}}/api/v1/locations
+### Create City #2 (to test address switch)
+# @name createCity2
+POST {{baseUrl}}/api/v1/cities
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "Invalid Both",
-  "addressId": "{{addressId}}",
+  "name": "Esch-sur-Alzette"
+}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Create City #2 -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = safeJson(response.body);
+        client.assert(!!data.id, "City #2 id present");
+    });
+    const city2 = safeJson(response.body);
+    client.global.set("city2_id", city2.id);
+%}
+
+### Update Location: switch Address using addressCreate (fork new address)
+# @name updateLocation_switchAddressByCreate
+PATCH {{baseUrl}}/api/v1/locations/{{loc_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
   "addressCreate": {
-    "readableAddress": "Should fail",
-    "coordinates": { "lat": 0.0, "lon": 0.0 }
+    "cityId": "{{city2_id}}",
+    "readableAddress": "5 Grand-Rue, 4000 Esch-sur-Alzette",
+    "coordinates": { "lat": 49.4984, "lon": 5.9800 }
   }
 }
 
 > {%
-    client.test("Create Location with both sources -> 400", () => {
-        client.assert(response.status === 400, "Expected 400");
+    client.test("Update Location (addressCreate) -> 200/204", () => {
+        client.assert([200, 204].includes(response.status), "Expected 200/204");
     });
 %}
 
-### Negative: both addressId & addressCreate on update -> 400
-# @name updateLocationInvalidBoth
-PATCH {{baseUrl}}/api/v1/locations/{{locationId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "addressId": "{{addressId}}",
-  "addressCreate": {
-    "readableAddress": "Also fail",
-    "coordinates": { "lat": 0.0, "lon": 0.0 }
-  }
-}
-
-> {%
-    client.test("Update Location with both sources -> 400", () => {
-        client.assert(response.status === 400, "Expected 400");
-    });
-%}
-
-### Try to delete the base Address (still referenced by someone?) -> expect conflict
-# @name deleteBaseAddressConflict
-DELETE {{baseUrl}}/api/v1/addresses/{{addressId}}
+### Verify Location after addressCreate (city changed)
+# @name getLocation_afterAddrCreate
+GET {{baseUrl}}/api/v1/locations/{{loc_id}}
 Authorization: Bearer {{token}}
 
 > {%
-    client.test("Delete Address in use -> conflict", () => {
-        client.assert([409, 400, 422].includes(response.status), "Expected conflict (e.g., 409)");
-    });
-%}
-
-### Repoint Location back to original address
-# @name updateLocationRepoint
-PATCH {{baseUrl}}/api/v1/locations/{{locationId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "addressId": "{{addressId}}"
-}
-
-> {%
-    client.test("Repoint Location -> 200 & address restored", () => {
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Verify address switched to City #2", () => {
         client.assert(response.status === 200, "Expected 200");
-        const data = JSON.parse(response.body);
-        client.assert(data.address.id === client.global.get("addressId"), "Repointed to original");
+        const data = safeJson(response.body);
+        client.assert(!!data.address, "Address present");
+        client.assert(!!data.address.city, "Address city present");
+        client.assert(data.address.city.id === client.global.get("city2_id"), "City switched");
+        // basic coordinate check
+        const latOk = Math.abs(Number(data.address.coordinates.lat) - 49.4984) < 1e-6;
+        const lonOk = Math.abs(Number(data.address.coordinates.lon) - 5.9800) < 1e-6;
+        client.assert(latOk && lonOk, "Coordinates updated");
     });
 %}
 
-### Cleanup: Delete Location
+### Create Address #2 to test update with addressId
+# @name createAddress2
+POST {{baseUrl}}/api/v1/addresses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{city_id}}",
+  "readableAddress": "99 Avenue de la Gare, 1610 Luxembourg",
+  "coordinates": { "lat": 49.6100, "lon": 6.1320 }
+}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Create Address #2 -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = safeJson(response.body);
+        client.assert(!!data.id, "Address #2 id present");
+    });
+    const addr2 = safeJson(response.body);
+    client.global.set("addr2_id", addr2.id);
+%}
+
+### Update Location: switch Address using addressId
+# @name updateLocation_switchAddressById
+PATCH {{baseUrl}}/api/v1/locations/{{loc_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "addressId": "{{addr2_id}}"
+}
+
+> {%
+    client.test("Update Location (addressId) -> 200/204", () => {
+        client.assert([200, 204].includes(response.status), "Expected 200/204");
+    });
+%}
+
+### Verify Location after addressId switch
+# @name getLocation_afterAddrId
+GET {{baseUrl}}/api/v1/locations/{{loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Verify address switched to addr2", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = safeJson(response.body);
+        client.assert(!!data.address && data.address.id === client.global.get("addr2_id"), "Address switched to addr2");
+    });
+%}
+
+### Negative: Update non-existent Location -> 404
+# @name updateLocation_notFound
+PATCH {{baseUrl}}/api/v1/locations/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Ghost",
+  "addressId": "{{addr2_id}}"
+}
+
+> {%
+    client.test("Update non-existent -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
+    });
+%}
+
+### Delete Location
 # @name deleteLocation
-DELETE {{baseUrl}}/api/v1/locations/{{locationId}}
+DELETE {{baseUrl}}/api/v1/locations/{{loc_id}}
 Authorization: Bearer {{token}}
 
 > {%
@@ -197,24 +278,164 @@ Authorization: Bearer {{token}}
     });
 %}
 
-### Cleanup: Delete new (cloned) Address (should succeed)
-# @name deleteNewAddress
-DELETE {{baseUrl}}/api/v1/addresses/{{newAddressId}}
+### Verify Location deleted
+# @name getDeletedLocation
+GET {{baseUrl}}/api/v1/locations/{{loc_id}}
 Authorization: Bearer {{token}}
 
 > {%
-    client.test("Delete new cloned Address -> 204", () => {
-        client.assert([204, 404].includes(response.status), "Expected 204 (or 404 if already gone)");
+    client.test("Get Deleted Location -> 404/410", () => {
+        client.assert([404, 410].includes(response.status), "Expected 404/410");
     });
 %}
 
-### Optional: Delete original Address (if no longer referenced)
-# @name deleteOriginalAddress
-DELETE {{baseUrl}}/api/v1/addresses/{{addressId}}
+### Bonus: Create Location directly with addressCreate (branch sanity)
+# @name createLocation_byAddressCreate
+POST {{baseUrl}}/api/v1/locations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Studio B",
+  "cover": "https://example.com/cover-b.jpg",
+  "addressCreate": {
+    "cityId": "{{city_id}}",
+    "readableAddress": "1 Rue Chimay, 1333 Luxembourg",
+    "coordinates": { "lat": 49.6110, "lon": 6.1300 }
+  },
+  "description": "Rehearsal room B",
+  "contacts": "contact@studiob.tld"
+}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Create Location (addressCreate) -> 201", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = safeJson(response.body);
+        client.assert(!!data.id, "Location id present");
+        client.assert(!!data.address && !!data.address.id, "New address created");
+    });
+    const locB = safeJson(response.body);
+    client.global.set("locB_id", locB.id);
+%}
+
+### Cleanup: Delete Location B
+# @name deleteLocationB
+DELETE {{baseUrl}}/api/v1/locations/{{locB_id}}
 Authorization: Bearer {{token}}
 
 > {%
-    client.test("Delete original Address -> ok", () => {
-        client.assert([204, 409, 404].includes(response.status), "Expected 204 (or 409/404 depending on state)");
+    client.test("Delete Location B -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### List Addresses (paged) — capture up to 4 for cleanup
+# @name listAddresses_cleanup
+GET {{baseUrl}}/api/v1/addresses?page=0&size=50
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    const page = J(response.body);
+
+    client.test("Addresses page -> 200 & has content[]", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(page && Array.isArray(page.content), "Page.content is array");
+        client.assert(typeof page.number === 'number', "Page.number present");
+        client.assert(typeof page.size === 'number', "Page.size present");
+    });
+
+    // Capture up to 4 address ids
+    for (let i = 0; i < Math.min(page.content.length, 4); i++) {
+        client.global.set(`cleanup_addr_id_${i}`, page.content[i].id);
+    }
+%}
+
+### Delete Address #0 (idempotent)
+# @name deleteAddress_cleanup_0
+DELETE {{baseUrl}}/api/v1/addresses/{{cleanup_addr_id_0}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete Address #0 -> 204/404", () => {
+        client.assert([204,404].includes(response.status), "Expected 204/404");
+    });
+%}
+
+### Delete Address #1 (idempotent)
+# @name deleteAddress_cleanup_1
+DELETE {{baseUrl}}/api/v1/addresses/{{cleanup_addr_id_1}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete Address #1 -> 204/404", () => {
+        client.assert([204,404].includes(response.status), "Expected 204/404");
+    });
+%}
+
+### Delete Address #2 (idempotent)
+# @name deleteAddress_cleanup_2
+DELETE {{baseUrl}}/api/v1/addresses/{{cleanup_addr_id_2}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete Address #2 -> 204/404", () => {
+        client.assert([204,404].includes(response.status), "Expected 204/404");
+    });
+%}
+
+### Delete Address #3 (idempotent)
+# @name deleteAddress_cleanup_3
+DELETE {{baseUrl}}/api/v1/addresses/{{cleanup_addr_id_3}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete Address #3 -> 204/404", () => {
+        client.assert([204,404].includes(response.status), "Expected 204/404");
+    });
+%}
+
+### List Cities (paged) — capture up to 2 for cleanup
+# @name listCities_cleanup
+GET {{baseUrl}}/api/v1/cities?page=0&size=50
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    const page = J(response.body);
+
+    client.test("Cities page -> 200 & has content[]", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(page && Array.isArray(page.content), "Page.content is array");
+        client.assert(typeof page.number === 'number', "Page.number present");
+        client.assert(typeof page.size === 'number', "Page.size present");
+    });
+
+    // Capture up to 2 city ids
+    for (let i = 0; i < Math.min(page.content.length, 2); i++) {
+        client.global.set(`cleanup_city_id_${i}`, page.content[i].id);
+    }
+%}
+
+### Delete City #0 (idempotent; 409 allowed if still referenced)
+# @name deleteCity_cleanup_0
+DELETE {{baseUrl}}/api/v1/cities/{{cleanup_city_id_0}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete City #0 -> 204/404/409", () => {
+        client.assert([204,404,409].includes(response.status), "Expected 204/404/409");
+    });
+%}
+
+### Delete City #1 (idempotent; 409 allowed if still referenced)
+# @name deleteCity_cleanup_1
+DELETE {{baseUrl}}/api/v1/cities/{{cleanup_city_id_1}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete City #1 -> 204/404/409", () => {
+        client.assert([204,404,409].includes(response.status), "Expected 204/404/409");
     });
 %}

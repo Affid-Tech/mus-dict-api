@@ -2,6 +2,7 @@ package org.affidtech.musdict.musdictapi.web
 
 import org.affidtech.musdict.musdictapi.domain.Address
 import org.affidtech.musdict.musdictapi.domain.City
+import org.affidtech.musdict.musdictapi.domain.Location
 import org.affidtech.musdict.musdictapi.web.dto.*
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
@@ -66,4 +67,23 @@ interface AddressMapper {
 	@Mapping(target = "coordinates", source = "coordinates", qualifiedByName = ["toPoint"])
 	@Mapping(target = "readableAddress", source = "readableAddress")
 	fun updateEntityFromDto(dto: AddressUpdate, @MappingTarget entity: Address)
+}
+
+@Mapper(
+	componentModel = "spring",
+	uses = [AddressMapper::class, CityMapper::class, PointMapper::class]
+)
+interface LocationMapper {
+	
+	fun toReadSummary(entity: Location): LocationReadSummary
+	
+	fun toReadDetail(entity: Location): LocationReadDetail
+	
+	/**
+	 * Updates only the "simple" fields of Location (name, cover, description, contacts).
+	 * Address must be handled manually in the service, since it needs DB lookups.
+	 */
+	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+	@Mapping(target = "address", ignore = true) // leave address handling to the service
+	fun updateEntityFromDto(dto: LocationUpdate, @MappingTarget entity: Location)
 }
