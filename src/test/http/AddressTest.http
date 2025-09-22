@@ -79,6 +79,22 @@ Authorization: Bearer {{token}}
     });
 %}
 
+### List Addresses (search & paging)
+# @name listAddresses_near
+GET {{baseUrl}}/api/v1/addresses?page=0&size=10&nearLat=49&nearLon=6
+Authorization: Bearer {{token}}
+
+> {%
+    function safeJson(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+
+    client.test("List Addresses -> 200 & array", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const arr = safeJson(response.body);
+        client.assert(Array.isArray(arr), "Expected array");
+        client.assert(arr.length >= 1, "At least one address found");
+    });
+%}
+
 ### Create Second City (to test city change on update)
 # @name createCity2
 POST {{baseUrl}}/api/v1/cities
