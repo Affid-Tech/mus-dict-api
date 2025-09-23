@@ -1,5 +1,6 @@
 package org.affidtech.musdict.musdictapi.web.controller
 
+
 import jakarta.validation.Valid
 import org.affidtech.musdict.musdictapi.service.LocationService
 import org.affidtech.musdict.musdictapi.web.dto.LocationCreate
@@ -13,18 +14,18 @@ import org.springframework.web.bind.annotation.*
 import java.math.BigDecimal
 import java.util.*
 
+
 @Validated
 @RestController
 @RequestMapping("/api/v1/locations")
 class LocationController(
 	private val locationService: LocationService
 ) {
-	
-	// Note: a concrete type of location is determined by the concrete endpoint you expose per type.
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	fun create(@RequestBody @Valid body: LocationCreate): LocationReadDetail =
 		locationService.create(body)
+	
 	
 	@GetMapping
 	fun list(
@@ -48,13 +49,16 @@ class LocationController(
 			sort = sort
 		)
 	
+	
 	@GetMapping("/{id}")
 	fun get(@PathVariable id: UUID): LocationReadDetail =
 		locationService.get(id)
 	
+	
 	@PatchMapping("/{id}")
 	fun update(@PathVariable id: UUID, @RequestBody @Valid body: LocationUpdate): LocationReadDetail =
 		locationService.update(id, body)
+	
 	
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)

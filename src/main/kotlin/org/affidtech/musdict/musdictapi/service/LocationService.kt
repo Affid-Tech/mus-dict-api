@@ -1,15 +1,16 @@
 package org.affidtech.musdict.musdictapi.service
 
+
 import org.affidtech.musdict.musdictapi.domain.Address
 import org.affidtech.musdict.musdictapi.domain.Location
-import org.affidtech.musdict.musdictapi.repository.AddressRepository
-import org.affidtech.musdict.musdictapi.repository.LocationRepository
+import org.affidtech.musdict.musdictapi.repository.*
 import org.affidtech.musdict.musdictapi.service.spec.LocationSpecifications
-import org.affidtech.musdict.musdictapi.web.AddressMapper
 import org.affidtech.musdict.musdictapi.web.LocationMapper
+import org.affidtech.musdict.musdictapi.web.dto.AddressCreate
 import org.affidtech.musdict.musdictapi.web.dto.LocationCreate
 import org.affidtech.musdict.musdictapi.web.dto.LocationReadDetail
 import org.affidtech.musdict.musdictapi.web.dto.LocationReadSummary
+import org.affidtech.musdict.musdictapi.web.dto.LocationType
 import org.affidtech.musdict.musdictapi.web.dto.LocationUpdate
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Page
@@ -24,20 +25,25 @@ import org.springframework.web.server.ResponseStatusException
 import java.math.BigDecimal
 import java.util.*
 
+
 @Service
 class LocationService(
 	private val locationRepository: LocationRepository,
 	private val addressService: AddressService,
 	private val addressRepository: AddressRepository,
-	private val addressMapper: AddressMapper,
-	private val locationMapper: LocationMapper
+	private val locationMapper: LocationMapper,
+// NEW: profile repos to compute types[] cheaply (like roles for users)
+	private val concertVenueRepo: ConcertVenueProfileRepository,
+	private val rentalRepo: RentalProfileRepository,
+	private val rehearsalBaseRepo: RehearsalBaseProfileRepository,
+	private val studioRepo: StudioProfileRepository
 ) {
+	
 	
 	@Transactional
 	fun create(dto: LocationCreate): LocationReadDetail {
-		val address = resolveAddressForCreate(dto)
+		val address = resolveAddressForCreate(dto.addressId to dto.addressCreate)
 		val entity = Location(
-			// id is @GeneratedValue (nullable) in your entity
 			name = dto.name,
 			cover = dto.cover,
 			address = address,
@@ -45,8 +51,10 @@ class LocationService(
 			contacts = dto.contacts
 		)
 		val saved = locationRepository.save(entity)
-		return locationMapper.toReadDetail(saved)
+		val t = typesFor(saved.id!!)
+		return locationMapper.toReadDetail(saved, t)
 	}
+	
 	
 	@Transactional(readOnly = true)
 	fun list(
@@ -66,15 +74,21 @@ class LocationService(
 				LocationSpecifications.qLike(q),
 				LocationSpecifications.withinDistance(nearLat, nearLon, radiusMeters)
 			)
-		return locationRepository.findAll(spec, pageable).map(locationMapper::toReadSummary)
+		return locationRepository.findAll(spec, pageable).map { entity ->
+			val id = entity.id ?: error("Persisted Location must have id")
+			val t = typesFor(id)
+			locationMapper.toReadSummary(entity, t)
+		}
 	}
+	
 	
 	@Transactional(readOnly = true)
 	fun get(id: UUID): LocationReadDetail {
 		val entity = locationRepository.findById(id).orElseThrow {
 			ResponseStatusException(HttpStatus.NOT_FOUND, "Location not found: $id")
 		}
-		return locationMapper.toReadDetail(entity)
+		val t = typesFor(id)
+		return locationMapper.toReadDetail(entity, t)
 	}
 	
 	@Transactional
@@ -83,27 +97,18 @@ class LocationService(
 			ResponseStatusException(HttpStatus.NOT_FOUND, "Location not found: $id")
 		}
 		
-		// MapStruct handles name, cover, description, contacts
 		locationMapper.updateEntityFromDto(dto, entity)
 		
-		// Address handling (at most one of addressId/addressCreate)
-		when {
-			dto.addressId != null -> {
-				val addr = addressRepository.findById(dto.addressId).orElseThrow {
-					ResponseStatusException(HttpStatus.BAD_REQUEST, "addressId not found: ${dto.addressId}")
-				}
-				entity.address = addr
-			}
-			dto.addressCreate != null -> {
-				val newAddress = addressService.create(dto.addressCreate).let { addressRepository.findById(it.id).orElseThrow() }
-				entity.address = newAddress
-			}
-		}
+		Pair(dto.addressId, dto.addressCreate)
+			.takeIf { addressData -> addressData.first != null || addressData.second != null }
+			?.let { addressData -> entity.address = resolveAddressForCreate(addressData) }
+		
 		
 		val saved = locationRepository.save(entity)
-		
-		return locationMapper.toReadDetail(saved)
+		val t = typesFor(saved.id!!)
+		return locationMapper.toReadDetail(saved, t)
 	}
+	
 	
 	@Transactional
 	fun delete(id: UUID) {
@@ -113,15 +118,11 @@ class LocationService(
 		try {
 			locationRepository.deleteById(id)
 		} catch (ex: DataIntegrityViolationException) {
-			// In case of FKs to Location
 			throw ResponseStatusException(
-				HttpStatus.CONFLICT,
-				"Location is referenced by other entities and cannot be deleted."
+				HttpStatus.CONFLICT, "Location is referenced by other entities and cannot be deleted."
 			)
 		}
 	}
-	
-	// --- helpers ---
 	
 	private fun toPageable(page: Int, size: Int, sort: String?): Pageable {
 		if (sort.isNullOrBlank()) return PageRequest.of(page, size)
@@ -132,12 +133,23 @@ class LocationService(
 			PageRequest.of(page, size, Sort.by(sort))
 	}
 	
-	private fun resolveAddressForCreate(dto: LocationCreate): Address =
+	
+	private fun resolveAddressForCreate(addressData: Pair<UUID?, AddressCreate?>): Address =
 		when {
-			dto.addressId != null -> addressRepository.findById(dto.addressId).orElseThrow {
-				ResponseStatusException(HttpStatus.BAD_REQUEST, "addressId not found: ${dto.addressId}")
+			addressData.first != null -> addressRepository.findById(addressData.first!!).orElseThrow {
+				ResponseStatusException(HttpStatus.BAD_REQUEST, "addressId not found: ${addressData.first}")
 			}
-			dto.addressCreate != null -> addressService.create(dto.addressCreate).let { addressRepository.findById(it.id).orElseThrow() }
+			addressData.second != null -> addressService.create(addressData.second!!).let { addressRepository.findById(it.id).orElseThrow() }
 			else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Exactly one of addressId or addressCreate must be provided")
 		}
+	
+	
+	private fun typesFor(locationId: UUID): List<LocationType> {
+		val result = mutableListOf<LocationType>()
+		if (concertVenueRepo.existsByLocationId(locationId)) result += LocationType.CONCERT_VENUE
+		if (rentalRepo.existsByLocationId(locationId)) result += LocationType.RENTAL
+		if (rehearsalBaseRepo.existsByLocationId(locationId)) result += LocationType.REHEARSAL_BASE
+		if (studioRepo.existsByLocationId(locationId)) result += LocationType.STUDIO
+		return result
+	}
 }

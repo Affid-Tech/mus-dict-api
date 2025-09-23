@@ -10,11 +10,11 @@ import org.locationtech.jts.geom.Point
 import org.locationtech.jts.geom.PrecisionModel
 import org.mapstruct.*
 import java.math.BigDecimal
-import java.util.UUID
+import java.util.*
+
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 interface CityMapper {
-	
 	@Named("toReadDetail")
 	fun toReadDetail(entity: City): CityReadDetail
 	
@@ -46,14 +46,12 @@ abstract class PointMapper {
 	}
 }
 
-@Mapper(
-	componentModel = "spring",
-	uses = [PointMapper::class, CityMapper::class]
-)
+
+@Mapper(componentModel = "spring", uses = [PointMapper::class, CityMapper::class])
 abstract class AddressMapper {
 	
 	@Mapping(target = "id", ignore = true)
-	@Mapping(target = "city", expression = "java(city)") // проставим в сервисе после загрузки City
+	@Mapping(target = "city", expression = "java(city)")
 	@Mapping(target = "coordinates", source = "coordinates", qualifiedByName = ["toPoint"])
 	abstract fun toEntity(dto: AddressCreate, @Context city: City): Address
 	
@@ -70,26 +68,24 @@ abstract class AddressMapper {
 	@Mapping(target = "city", source = "cityId", conditionExpression = "java(city != null)")
 	abstract fun updateEntityFromDto(dto: AddressUpdate, @MappingTarget entity: Address, @Context city: City?)
 	
-	fun provideCity(cityId: UUID, @Context city: City): City {
-		return city
-	}
+	fun provideCity(cityId: UUID, @Context city: City): City = city
 }
 
-@Mapper(
-	componentModel = "spring",
-	uses = [AddressMapper::class, CityMapper::class, PointMapper::class]
-)
+
+@Mapper(componentModel = "spring", uses = [AddressMapper::class, CityMapper::class, PointMapper::class])
 interface LocationMapper {
 	
-	fun toReadSummary(entity: Location): LocationReadSummary
+	@Mapping(target = "types", expression = "java(types)")
+	fun toReadSummary(entity: Location, @Context types: List<LocationType>): LocationReadSummary
 	
-	fun toReadDetail(entity: Location): LocationReadDetail
+	@Mapping(target = "types", expression = "java(types)")
+	fun toReadDetail(entity: Location, @Context types: List<LocationType>): LocationReadDetail
 	
 	/**
-	 * Updates only the "simple" fields of Location (name, cover, description, contacts).
-	 * Address must be handled manually in the service, since it needs DB lookups.
+	 * Updates only the simple fields (name, cover, description, contacts).
+	 * Address is handled in the service.
 	 */
 	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-	@Mapping(target = "address", ignore = true) // leave address handling to the service
+	@Mapping(target = "address", ignore = true)
 	fun updateEntityFromDto(dto: LocationUpdate, @MappingTarget entity: Location)
 }

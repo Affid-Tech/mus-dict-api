@@ -7,77 +7,86 @@ import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 import java.util.*
 
-//enum class LocationType {
-//	LOCATION
-//	// Extend with more specific types (e.g., STUDIO, VENUE, SHOP, etc.)
-//}
+enum class LocationType {
+	CONCERT_VENUE,
+	REHEARSAL_BASE,
+	STUDIO,
+	RENTAL
+}
 
 data class LocationReadSummary(
 	@field:NotNull
 	val id: UUID,
 	
-//	/**
-//	 * Read-only discriminator set. Multiple values allowed if a location
-//	 * belongs to multiple logical types.
-//	 */
-//	@field:NotEmpty
-//	val types: List<LocationType>,
+	val types: List<LocationType> = emptyList(),
+	
 	
 	@field:NotBlank
 	@field:Size(min = 1, max = 200)
 	val name: String,
 	
+	
 	@field:Size(max = 1000)
 	val cover: String? = null,
 	
+	
 	@field:Valid
-	val address: AddressReadSummary
+	val address: AddressReadSummary,
 )
+
 
 data class LocationReadDetail(
 	@field:NotNull
 	val id: UUID,
-//
-//	@field:NotEmpty
-//	val types: List<LocationType>,
+	
+	val types: List<LocationType> = emptyList(),
 	
 	@field:NotBlank
 	@field:Size(min = 1, max = 200)
 	val name: String,
 	
+	
 	@field:Size(max = 1000)
 	val cover: String? = null,
+	
 	
 	@field:Valid
 	val address: AddressReadDetail,
 	
+	
 	@field:Size(max = 5000)
 	val description: String? = null,
 	
+	
 	@field:Size(max = 2000)
-	val contacts: String? = null
+	val contacts: String? = null,
 )
 
-// Writes: type is determined by endpoint; clients DO NOT send `types`.
+
+// Writes: type profiles are separate resources; clients DO NOT send 'types'.
+
 
 data class LocationCreate(
 	@field:NotBlank
 	@field:Size(min = 1, max = 200)
 	val name: String,
 	
+	
 	@field:Size(max = 1000)
 	val cover: String? = null,
 	
-	/**
-	 * Exactly one of [addressId] or [addressCreate] must be provided.
-	 */
+	
+	/** Exactly one of [addressId] or [addressCreate] must be provided. */
 	val addressId: UUID? = null,
+	
 	
 	@field:Valid
 	val addressCreate: AddressCreate? = null,
 	
+	
 	@field:Size(max = 5000)
 	val description: String? = null,
+	
 	
 	@field:Size(max = 2000)
 	val contacts: String? = null
@@ -91,20 +100,22 @@ data class LocationUpdate(
 	@field:Size(min = 1, max = 200)
 	val name: String? = null,
 	
+	
 	@field:Size(max = 1000)
 	val cover: String? = null,
 	
-	/**
-	 * If present, exactly one of [addressId] or [addressCreate] may be provided.
-	 * If neither is present, the address remains unchanged.
-	 */
+	
+	/** If present, at most one of [addressId] or [addressCreate] may be provided. */
 	val addressId: UUID? = null,
+	
 	
 	@field:Valid
 	val addressCreate: AddressCreate? = null,
 	
+	
 	@field:Size(max = 5000)
 	val description: String? = null,
+	
 	
 	@field:Size(max = 2000)
 	val contacts: String? = null
