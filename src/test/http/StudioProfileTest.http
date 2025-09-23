@@ -1,0 +1,202 @@
+### Create City (STUDIO)
+# @name st_createCity
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Luxembourg-STUDIO" }
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("STUDIO: Create City -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "City id present");
+    });
+    client.global.set("st_city_id", J(response.body).id);
+%}
+
+### Create Address (STUDIO)
+# @name st_createAddress
+POST {{baseUrl}}/api/v1/addresses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{st_city_id}}",
+  "readableAddress": "40 Rue du Studio, 4444 Luxembourg",
+  "coordinates": { "lat": 49.6140, "lon": 6.1340 }
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("STUDIO: Create Address -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "Address id present");
+    });
+    client.global.set("st_addr_id", J(response.body).id);
+%}
+
+### Create Location (STUDIO)
+# @name st_createLocation
+POST {{baseUrl}}/api/v1/locations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Studio A",
+  "addressId": "{{st_addr_id}}"
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("STUDIO: Create Location -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "Location id present");
+    });
+    client.global.set("st_loc_id", J(response.body).id);
+%}
+
+### GET profile before attach -> 404
+# @name st_get_beforeAttach
+GET {{baseUrl}}/api/v1/locations/{{st_loc_id}}/studio
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("STUDIO: GET before attach -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
+    });
+%}
+
+### Attach Studio
+# @name st_attach
+POST {{baseUrl}}/api/v1/locations/{{st_loc_id}}/studio
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("STUDIO: Attach -> 201", () => {
+        client.assert(response.status === 201, "Expected 201");
+    });
+%}
+
+### Verify Location types include STUDIO
+# @name st_verify_types_afterAttach
+GET {{baseUrl}}/api/v1/locations/{{st_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("STUDIO: types include STUDIO", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(J(response.body).types.includes("STUDIO"), "type present");
+    });
+%}
+
+### GET profile (after attach)
+# @name st_get
+GET {{baseUrl}}/api/v1/locations/{{st_loc_id}}/studio
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("STUDIO: GET -> 200", () => {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}
+
+### Re-attach (conflict)
+# @name st_attach_conflict
+POST {{baseUrl}}/api/v1/locations/{{st_loc_id}}/studio
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("STUDIO: Re-attach -> 409", () => {
+        client.assert(response.status === 409, "Expected 409");
+    });
+%}
+
+### Patch Studio (noop ok)
+# @name st_patch
+PATCH {{baseUrl}}/api/v1/locations/{{st_loc_id}}/studio
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("STUDIO: Patch -> 200", () => {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}
+
+### Detach Studio
+# @name st_detach
+DELETE {{baseUrl}}/api/v1/locations/{{st_loc_id}}/studio
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("STUDIO: Detach -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### GET after detach -> 404
+# @name st_get_afterDetach
+GET {{baseUrl}}/api/v1/locations/{{st_loc_id}}/studio
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("STUDIO: GET after detach -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
+    });
+%}
+
+### Verify Location types exclude STUDIO
+# @name st_verify_types_afterDetach
+GET {{baseUrl}}/api/v1/locations/{{st_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("STUDIO: type removed", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(!J(response.body).types.includes("STUDIO"), "type removed");
+    });
+%}
+
+### Cleanup STUDIO: delete Location
+# @name st_delete_location
+DELETE {{baseUrl}}/api/v1/locations/{{st_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("STUDIO: Delete Location -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### Cleanup STUDIO: delete Address
+# @name st_delete_address
+DELETE {{baseUrl}}/api/v1/addresses/{{st_addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("STUDIO: Delete Address -> 204/404", () => {
+        client.assert([204,404].includes(response.status), "Expected 204/404");
+    });
+%}
+
+### Cleanup STUDIO: delete City
+# @name st_delete_city
+DELETE {{baseUrl}}/api/v1/cities/{{st_city_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("STUDIO: Delete City -> 204/404/409", () => {
+        client.assert([204,404,409].includes(response.status), "Expected 204/404/409");
+    });
+%}

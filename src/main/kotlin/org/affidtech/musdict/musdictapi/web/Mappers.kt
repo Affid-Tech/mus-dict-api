@@ -2,7 +2,11 @@ package org.affidtech.musdict.musdictapi.web
 
 import org.affidtech.musdict.musdictapi.domain.Address
 import org.affidtech.musdict.musdictapi.domain.City
+import org.affidtech.musdict.musdictapi.domain.ConcertVenueProfile
 import org.affidtech.musdict.musdictapi.domain.Location
+import org.affidtech.musdict.musdictapi.domain.RehearsalBaseProfile
+import org.affidtech.musdict.musdictapi.domain.RentalProfile
+import org.affidtech.musdict.musdictapi.domain.StudioProfile
 import org.affidtech.musdict.musdictapi.web.dto.*
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
@@ -88,4 +92,37 @@ interface LocationMapper {
 	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 	@Mapping(target = "address", ignore = true)
 	fun updateEntityFromDto(dto: LocationUpdate, @MappingTarget entity: Location)
+}
+
+@Mapper(componentModel = "spring")
+interface ConcertVenueProfileMapper {
+	
+	fun toDto(entity: ConcertVenueProfile): ConcertVenueProfileDto
+	
+	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+	fun updateFromPatch(dto: ConcertVenueProfilePatchDto, @MappingTarget entity: ConcertVenueProfile)
+}
+
+@Mapper(componentModel = "spring")
+interface RentalProfileMapper {
+	fun toDto(entity: RentalProfile): RentalProfileDto
+	
+	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+	fun updateFromPatch(dto: RentalProfilePatchDto, @MappingTarget entity: RentalProfile)
+}
+
+@Mapper(componentModel = "spring")
+interface RehearsalBaseProfileMapper {
+	fun toDto(entity: RehearsalBaseProfile): RehearsalBaseProfileDto
+	
+	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+	fun updateFromPatch(dto: RehearsalBaseProfilePatchDto, @MappingTarget entity: RehearsalBaseProfile)
+}
+
+@Mapper(componentModel = "spring")
+interface StudioProfileMapper {
+	fun toDto(entity: StudioProfile): StudioProfileDto
+	
+	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+	fun updateFromPatch(dto: StudioProfilePatchDto, @MappingTarget entity: StudioProfile)
 }

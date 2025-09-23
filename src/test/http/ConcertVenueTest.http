@@ -1,0 +1,234 @@
+### Create City (CV)
+# @name cv_createCity
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Luxembourg-CV" }
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("CV: Create City -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = J(response.body);
+        client.assert(!!data.id, "City id present");
+    });
+    const city = J(response.body);
+    client.global.set("cv_city_id", city.id);
+%}
+
+### Create Address (CV)
+# @name cv_createAddress
+POST {{baseUrl}}/api/v1/addresses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{cv_city_id}}",
+  "readableAddress": "10 Rue du Concert, 1111 Luxembourg",
+  "coordinates": { "lat": 49.6117, "lon": 6.1319 }
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("CV: Create Address -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = J(response.body);
+        client.assert(!!data.id, "Address id present");
+    });
+    const addr = J(response.body);
+    client.global.set("cv_addr_id", addr.id);
+%}
+
+### Create Location (CV)
+# @name cv_createLocation
+POST {{baseUrl}}/api/v1/locations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Concert Hall A",
+  "cover": "https://example.com/cv-cover.jpg",
+  "addressId": "{{cv_addr_id}}",
+  "description": "Main hall",
+  "contacts": "hall@example.com"
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("CV: Create Location -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = J(response.body);
+        client.assert(!!data.id, "Location id present");
+        client.assert(Array.isArray(data.types), "types[] present");
+        client.assert(!data.types.includes("CONCERT_VENUE"), "No CV type yet");
+    });
+    const loc = J(response.body);
+    client.global.set("cv_loc_id", loc.id);
+%}
+
+### GET profile before attach -> 404
+# @name cv_get_beforeAttach
+GET {{baseUrl}}/api/v1/locations/{{cv_loc_id}}/concert-venue
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV: GET before attach -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
+    });
+%}
+
+### Attach Concert Venue
+# @name cv_attach
+POST {{baseUrl}}/api/v1/locations/{{cv_loc_id}}/concert-venue
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "capacity": 800,
+  "terms": "No smoking. Load-in via south gate."
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("CV: Attach -> 201", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = J(response.body);
+        client.assert(data.capacity === 800, "capacity ok");
+    });
+%}
+
+### Verify Location types include CONCERT_VENUE
+# @name cv_verify_types_afterAttach
+GET {{baseUrl}}/api/v1/locations/{{cv_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("CV: Location types include CONCERT_VENUE", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = J(response.body);
+        client.assert(Array.isArray(data.types), "types[] present");
+        client.assert(data.types.includes("CONCERT_VENUE"), "type present");
+    });
+%}
+
+### GET profile (after attach)
+# @name cv_get
+GET {{baseUrl}}/api/v1/locations/{{cv_loc_id}}/concert-venue
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("CV: GET profile -> 200", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = J(response.body);
+        client.assert(data.capacity === 800, "capacity ok");
+        client.assert(!!data.terms, "terms present");
+    });
+%}
+
+### Re-attach (conflict)
+# @name cv_attach_conflict
+POST {{baseUrl}}/api/v1/locations/{{cv_loc_id}}/concert-venue
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "capacity": 500 }
+
+> {%
+    client.test("CV: Re-attach -> 409", () => {
+        client.assert(response.status === 409, "Expected 409");
+    });
+%}
+
+### Patch Concert Venue
+# @name cv_patch
+PATCH {{baseUrl}}/api/v1/locations/{{cv_loc_id}}/concert-venue
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "capacity": 900,
+  "terms": "Updated terms: no pyrotechnics."
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("CV: Patch -> 200 & values updated", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = J(response.body);
+        client.assert(data.capacity === 900, "capacity updated");
+        client.assert(data.terms === "Updated terms: no pyrotechnics.", "terms updated");
+    });
+%}
+
+### Detach Concert Venue
+# @name cv_detach
+DELETE {{baseUrl}}/api/v1/locations/{{cv_loc_id}}/concert-venue
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV: Detach -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### GET after detach -> 404
+# @name cv_get_afterDetach
+GET {{baseUrl}}/api/v1/locations/{{cv_loc_id}}/concert-venue
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV: GET after detach -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
+    });
+%}
+
+### Verify Location types no longer include CONCERT_VENUE
+# @name cv_verify_types_afterDetach
+GET {{baseUrl}}/api/v1/locations/{{cv_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("CV: Location types exclude CONCERT_VENUE", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = J(response.body);
+        client.assert(Array.isArray(data.types), "types[] present");
+        client.assert(!data.types.includes("CONCERT_VENUE"), "type removed");
+    });
+%}
+
+### Cleanup CV: delete Location
+# @name cv_delete_location
+DELETE {{baseUrl}}/api/v1/locations/{{cv_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV: Delete Location -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### Cleanup CV: delete Address
+# @name cv_delete_address
+DELETE {{baseUrl}}/api/v1/addresses/{{cv_addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV: Delete Address -> 204/404", () => {
+        client.assert([204,404].includes(response.status), "Expected 204/404");
+    });
+%}
+
+### Cleanup CV: delete City
+# @name cv_delete_city
+DELETE {{baseUrl}}/api/v1/cities/{{cv_city_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV: Delete City -> 204/404/409", () => {
+        client.assert([204,404,409].includes(response.status), "Expected 204/404/409");
+    });
+%}

@@ -1,0 +1,191 @@
+### Create City (RENTAL)
+# @name rent_createCity
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Luxembourg-RENTAL" }
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RENTAL: Create City -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "City id present");
+    });
+    client.global.set("rent_city_id", J(response.body).id);
+%}
+
+### Create Address (RENTAL)
+# @name rent_createAddress
+POST {{baseUrl}}/api/v1/addresses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{rent_city_id}}",
+  "readableAddress": "20 Rue du Gear, 2222 Luxembourg",
+  "coordinates": { "lat": 49.6120, "lon": 6.1325 }
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RENTAL: Create Address -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "Address id present");
+    });
+    client.global.set("rent_addr_id", J(response.body).id);
+%}
+
+### Create Location (RENTAL)
+# @name rent_createLocation
+POST {{baseUrl}}/api/v1/locations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Rental Hub A",
+  "addressId": "{{rent_addr_id}}"
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RENTAL: Create Location -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "Location id present");
+    });
+    client.global.set("rent_loc_id", J(response.body).id);
+%}
+
+### GET profile before attach -> 404
+# @name rent_get_beforeAttach
+GET {{baseUrl}}/api/v1/locations/{{rent_loc_id}}/rental
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENTAL: GET before attach -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
+    });
+%}
+
+### Attach Rental
+# @name rent_attach
+POST {{baseUrl}}/api/v1/locations/{{rent_loc_id}}/rental
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("RENTAL: Attach -> 201", () => {
+        client.assert(response.status === 201, "Expected 201");
+    });
+%}
+
+### Verify Location types include RENTAL
+# @name rent_verify_types_afterAttach
+GET {{baseUrl}}/api/v1/locations/{{rent_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RENTAL: types include RENTAL", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(J(response.body).types.includes("RENTAL"), "RENTAL present");
+    });
+%}
+
+### GET profile (after attach)
+# @name rent_get
+GET {{baseUrl}}/api/v1/locations/{{rent_loc_id}}/rental
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENTAL: GET -> 200", () => {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}
+
+### Re-attach (conflict)
+# @name rent_attach_conflict
+POST {{baseUrl}}/api/v1/locations/{{rent_loc_id}}/rental
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("RENTAL: Re-attach -> 409", () => {
+        client.assert(response.status === 409, "Expected 409");
+    });
+%}
+
+### Patch Rental (noop ok)
+# @name rent_patch
+PATCH {{baseUrl}}/api/v1/locations/{{rent_loc_id}}/rental
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("RENTAL: Patch -> 200", () => {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}
+
+### Detach Rental
+# @name rent_detach
+DELETE {{baseUrl}}/api/v1/locations/{{rent_loc_id}}/rental
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENTAL: Detach -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### Verify Location types exclude RENTAL
+# @name rent_verify_types_afterDetach
+GET {{baseUrl}}/api/v1/locations/{{rent_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RENTAL: type removed", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(!J(response.body).types.includes("RENTAL"), "RENTAL removed");
+    });
+%}
+
+### Cleanup RENTAL: delete Location
+# @name rent_delete_location
+DELETE {{baseUrl}}/api/v1/locations/{{rent_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENTAL: Delete Location -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### Cleanup RENTAL: delete Address
+# @name rent_delete_address
+DELETE {{baseUrl}}/api/v1/addresses/{{rent_addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENTAL: Delete Address -> 204/404", () => {
+        client.assert([204,404].includes(response.status), "Expected 204/404");
+    });
+%}
+
+### Cleanup RENTAL: delete City
+# @name rent_delete_city
+DELETE {{baseUrl}}/api/v1/cities/{{rent_city_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENTAL: Delete City -> 204/404/409", () => {
+        client.assert([204,404,409].includes(response.status), "Expected 204/404/409");
+    });
+%}

@@ -1,21 +1,32 @@
 package org.affidtech.musdict.musdictapi.domain
 
 import jakarta.persistence.*
+import java.io.Serializable
 import java.util.*
 
 @Entity
 @Table(name = "rental_equipment")
 class RentalEquipment(
-	@Id @GeneratedValue
-	var id: UUID? = null,
 	
-	@ManyToOne(fetch = FetchType.LAZY)
+	@EmbeddedId
+	var id: RentalEquipmentId = RentalEquipmentId(),
+	
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@MapsId("rentalId")
 	@JoinColumn(name = "rental_id", nullable = false)
 	var rental: RentalProfile,
 	
-	@Column(nullable = false, length = 120)
-	var name: String,
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@MapsId("equipmentId")
+	@JoinColumn(name = "equipment_id", nullable = false)
+	var equipment: Equipment,
 	
-	@Column(nullable = true, columnDefinition = "text")
-	var details: String? = null
+	@Column(nullable = false)
+	var quantity: Int
 )
+
+@Embeddable
+data class RentalEquipmentId(
+	var rentalId: UUID? = null,
+	var equipmentId: UUID? = null
+) : Serializable

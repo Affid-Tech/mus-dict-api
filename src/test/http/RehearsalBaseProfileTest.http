@@ -1,0 +1,202 @@
+### Create City (RB)
+# @name rb_createCity
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Luxembourg-RB" }
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RB: Create City -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "City id present");
+    });
+    client.global.set("rb_city_id", J(response.body).id);
+%}
+
+### Create Address (RB)
+# @name rb_createAddress
+POST {{baseUrl}}/api/v1/addresses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{rb_city_id}}",
+  "readableAddress": "30 Rue des Drums, 3333 Luxembourg",
+  "coordinates": { "lat": 49.6130, "lon": 6.1330 }
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RB: Create Address -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "Address id present");
+    });
+    client.global.set("rb_addr_id", J(response.body).id);
+%}
+
+### Create Location (RB)
+# @name rb_createLocation
+POST {{baseUrl}}/api/v1/locations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Rehearsal Base A",
+  "addressId": "{{rb_addr_id}}"
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RB: Create Location -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "Location id present");
+    });
+    client.global.set("rb_loc_id", J(response.body).id);
+%}
+
+### GET profile before attach -> 404
+# @name rb_get_beforeAttach
+GET {{baseUrl}}/api/v1/locations/{{rb_loc_id}}/rehearsal-base
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RB: GET before attach -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
+    });
+%}
+
+### Attach Rehearsal Base
+# @name rb_attach
+POST {{baseUrl}}/api/v1/locations/{{rb_loc_id}}/rehearsal-base
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("RB: Attach -> 201", () => {
+        client.assert(response.status === 201, "Expected 201");
+    });
+%}
+
+### Verify Location types include REHEARSAL_BASE
+# @name rb_verify_types_afterAttach
+GET {{baseUrl}}/api/v1/locations/{{rb_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RB: types include REHEARSAL_BASE", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(J(response.body).types.includes("REHEARSAL_BASE"), "type present");
+    });
+%}
+
+### GET profile (after attach)
+# @name rb_get
+GET {{baseUrl}}/api/v1/locations/{{rb_loc_id}}/rehearsal-base
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RB: GET -> 200", () => {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}
+
+### Re-attach (conflict)
+# @name rb_attach_conflict
+POST {{baseUrl}}/api/v1/locations/{{rb_loc_id}}/rehearsal-base
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("RB: Re-attach -> 409", () => {
+        client.assert(response.status === 409, "Expected 409");
+    });
+%}
+
+### Patch Rehearsal Base (noop ok)
+# @name rb_patch
+PATCH {{baseUrl}}/api/v1/locations/{{rb_loc_id}}/rehearsal-base
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("RB: Patch -> 200", () => {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}
+
+### Detach Rehearsal Base
+# @name rb_detach
+DELETE {{baseUrl}}/api/v1/locations/{{rb_loc_id}}/rehearsal-base
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RB: Detach -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### GET after detach -> 404
+# @name rb_get_afterDetach
+GET {{baseUrl}}/api/v1/locations/{{rb_loc_id}}/rehearsal-base
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RB: GET after detach -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
+    });
+%}
+
+### Verify Location types exclude REHEARSAL_BASE
+# @name rb_verify_types_afterDetach
+GET {{baseUrl}}/api/v1/locations/{{rb_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("RB: type removed", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(!J(response.body).types.includes("REHEARSAL_BASE"), "type removed");
+    });
+%}
+
+### Cleanup RB: delete Location
+# @name rb_delete_location
+DELETE {{baseUrl}}/api/v1/locations/{{rb_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RB: Delete Location -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### Cleanup RB: delete Address
+# @name rb_delete_address
+DELETE {{baseUrl}}/api/v1/addresses/{{rb_addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RB: Delete Address -> 204/404", () => {
+        client.assert([204,404].includes(response.status), "Expected 204/404");
+    });
+%}
+
+### Cleanup RB: delete City
+# @name rb_delete_city
+DELETE {{baseUrl}}/api/v1/cities/{{rb_city_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RB: Delete City -> 204/404/409", () => {
+        client.assert([204,404,409].includes(response.status), "Expected 204/404/409");
+    });
+%}
