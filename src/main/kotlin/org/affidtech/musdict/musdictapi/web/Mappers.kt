@@ -10,6 +10,7 @@ import org.locationtech.jts.geom.Point
 import org.locationtech.jts.geom.PrecisionModel
 import org.mapstruct.*
 import java.math.BigDecimal
+import java.util.UUID
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 interface CityMapper {
@@ -49,24 +50,29 @@ abstract class PointMapper {
 	componentModel = "spring",
 	uses = [PointMapper::class, CityMapper::class]
 )
-interface AddressMapper {
+abstract class AddressMapper {
 	
 	@Mapping(target = "id", ignore = true)
-	@Mapping(target = "city", ignore = true) // проставим в сервисе после загрузки City
+	@Mapping(target = "city", expression = "java(city)") // проставим в сервисе после загрузки City
 	@Mapping(target = "coordinates", source = "coordinates", qualifiedByName = ["toPoint"])
-	fun toEntity(dto: AddressCreate): Address
+	abstract fun toEntity(dto: AddressCreate, @Context city: City): Address
 	
 	@Mapping(target = "coordinates", source = "coordinates", qualifiedByName = ["toDto"])
 	@Mapping(target = "city", source = "city", qualifiedByName = ["toReadDetail"])
-	fun toReadDetail(entity: Address): AddressReadDetail
+	abstract fun toReadDetail(entity: Address): AddressReadDetail
 	
 	@Mapping(target = "city", source = "city", qualifiedByName = ["toReadSummary"])
-	fun toReadSummary(entity: Address): AddressReadSummary
+	abstract fun toReadSummary(entity: Address): AddressReadSummary
 	
 	@BeanMapping(ignoreByDefault = true)
 	@Mapping(target = "coordinates", source = "coordinates", qualifiedByName = ["toPoint"])
 	@Mapping(target = "readableAddress", source = "readableAddress")
-	fun updateEntityFromDto(dto: AddressUpdate, @MappingTarget entity: Address)
+	@Mapping(target = "city", source = "cityId", conditionExpression = "java(city != null)")
+	abstract fun updateEntityFromDto(dto: AddressUpdate, @MappingTarget entity: Address, @Context city: City?)
+	
+	fun provideCity(cityId: UUID, @Context city: City): City {
+		return city
+	}
 }
 
 @Mapper(

@@ -13,10 +13,10 @@ data class AddressReadSummary(
 	val id: UUID,
 	
 	@field:Size(max = 500)
-	val readableAddress: String? = null,
+	val readableAddress: String,
 	
 	@field:Valid
-	val city: CityReadSummary? = null
+	val city: CityReadSummary
 )
 
 data class AddressReadDetail(
@@ -24,16 +24,26 @@ data class AddressReadDetail(
 	val id: UUID,
 	
 	@field:Size(max = 500)
-	val readableAddress: String? = null,
+	val readableAddress: String,
 	
 	@field:Valid
-	val city: CityReadSummary? = null,
+	val city: CityReadSummary,
 	
 	@field:Valid
 	val coordinates: CoordinatesDto? = null
 )
 
 data class AddressCreate(
+	val cityId: UUID,
+	
+	@field:Valid
+	val coordinates: CoordinatesDto? = null,
+	
+	@field:Size(max = 500)
+	val readableAddress: String
+)
+
+data class AddressUpdate(
 	val cityId: UUID? = null,
 	
 	@field:Valid
@@ -42,8 +52,6 @@ data class AddressCreate(
 	@field:Size(max = 500)
 	val readableAddress: String? = null
 )
-
-typealias AddressUpdate = AddressCreate
 
 data class CoordinatesDto(
 	@field:NotNull

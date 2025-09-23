@@ -5,7 +5,6 @@ import java.util.*
 
 @Entity
 @Table(name = "location")
-@Inheritance(strategy = InheritanceType.JOINED)
 class Location(
 	@Id
 	@GeneratedValue

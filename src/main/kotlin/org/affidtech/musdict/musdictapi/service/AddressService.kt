@@ -30,14 +30,12 @@ class AddressService(
 	
 	@Transactional
 	fun create(dto: AddressCreate): AddressReadDetail {
-		val city = dto.cityId?.let { id ->
+		val city = dto.cityId.let { id ->
 			cityRepository.findById(id).orElseThrow {
 				ResponseStatusException(HttpStatus.BAD_REQUEST, "cityId not found: $id")
 			}
 		}
-		val entity = mapper.toEntity(dto).also {
-			it.city = city
-		}
+		val entity = mapper.toEntity(dto, city)
 		val saved = addressRepository.save(entity)
 		return mapper.toReadDetail(saved)
 	}
@@ -89,8 +87,7 @@ class AddressService(
 			}
 		}
 		
-		mapper.updateEntityFromDto(dto, entity)
-		entity.city = city ?: entity.city
+		mapper.updateEntityFromDto(dto, entity, city)
 		
 		val saved = addressRepository.save(entity)
 		

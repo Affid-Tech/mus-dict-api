@@ -5,19 +5,17 @@ import java.util.*
 
 @Entity
 @Table(name = "rental_equipment")
-data class RentalEquipment(
-	@Id
-	@GeneratedValue
+class RentalEquipment(
+	@Id @GeneratedValue
 	var id: UUID? = null,
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "rental_id", nullable = false)
-	val rental: Rental,
+	var rental: RentalProfile,
 	
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "equipment_id", nullable = false)
-	val equipment: Equipment,
+	@Column(nullable = false, length = 120)
+	var name: String,
 	
-	@Column(nullable = false)
-	val quantity: Int
+	@Column(nullable = true, columnDefinition = "text")
+	var details: String? = null
 )
