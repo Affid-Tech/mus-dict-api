@@ -1,0 +1,180 @@
+### Create Equipment #1
+# @name eq_create_1
+POST {{baseUrl}}/api/v1/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "EQ-Alpha-HTTP-1",
+  "cover": "https://example.com/alpha.jpg",
+  "description": "Dynamic microphone, cardioid"
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Create #1 -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        const data = J(response.body);
+        client.assert(!!data.id, "id present");
+        client.assert(data.name === "EQ-Alpha-HTTP-1", "name ok");
+    });
+    client.global.set("eq1_id", J(response.body).id);
+%}
+
+### Get Equipment #1
+# @name eq_get_1
+GET {{baseUrl}}/api/v1/equipment/{{eq1_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Get #1 -> 200 & same id", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(J(response.body).id === client.global.get("eq1_id"), "IDs match");
+    });
+%}
+
+### List Equipment (paging & search by q)
+# @name eq_list_search
+GET {{baseUrl}}/api/v1/equipment?q=EQ-Alpha&page=0&size=10&sort=name,asc
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    const page = J(response.body);
+    client.test("List (q) -> 200 & contains #1", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(Array.isArray(page.content), "content is array");
+        const found = page.content.some(it => it.id === client.global.get("eq1_id"));
+        client.assert(found, "result contains Equipment #1");
+    });
+%}
+
+### Patch Equipment #1 (rename + description)
+# @name eq_patch_1
+PATCH {{baseUrl}}/api/v1/equipment/{{eq1_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "EQ-Alpha-HTTP-1 (Renamed)",
+  "description": "Dynamic microphone, cardioid — updated"
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Patch #1 -> 200 & fields updated", () => {
+        client.assert(response.status === 200, "Expected 200");
+        const data = J(response.body);
+        client.assert(data.name === "EQ-Alpha-HTTP-1 (Renamed)", "name updated");
+        client.assert(data.description.includes("updated"), "description updated");
+    });
+%}
+
+### Create Equipment #2
+# @name eq_create_2
+POST {{baseUrl}}/api/v1/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "EQ-Beta-HTTP-2",
+  "cover": "https://example.com/beta.jpg",
+  "description": "Condenser microphone, cardioid"
+}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    client.test("Create #2 -> 201 & id", () => {
+        client.assert(response.status === 201, "Expected 201");
+        client.assert(!!J(response.body).id, "id present");
+    });
+    client.global.set("eq2_id", J(response.body).id);
+%}
+
+### Duplicate name conflict: try renaming #2 to #1's name
+# @name eq_patch_2_conflict
+PATCH {{baseUrl}}/api/v1/equipment/{{eq2_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "EQ-Alpha-HTTP-1 (Renamed)"
+}
+
+> {%
+    client.test("Duplicate name -> 409", () => {
+        client.assert(response.status === 409, "Expected 409");
+    });
+%}
+
+### List Equipment (no filter; ensure paging fields are present)
+# @name eq_list_all
+GET {{baseUrl}}/api/v1/equipment?page=0&size=5&sort=name,asc
+Authorization: Bearer {{token}}
+
+> {%
+    function J(b){ return (typeof b === 'string') ? JSON.parse(b) : b; }
+    const page = J(response.body);
+    client.test("List all -> 200 & page fields", () => {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(typeof page.number === 'number', "page.number present");
+        client.assert(typeof page.size === 'number', "page.size present");
+        client.assert(Array.isArray(page.content), "content is array");
+    });
+%}
+
+### Negative: Get non-existent -> 404
+# @name eq_get_404
+GET {{baseUrl}}/api/v1/equipment/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Get non-existent -> 404", () => {
+        client.assert(response.status === 404, "Expected 404");
+    });
+%}
+
+### Delete Equipment #2
+# @name eq_delete_2
+DELETE {{baseUrl}}/api/v1/equipment/{{eq2_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete #2 -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### Verify #2 deleted -> 404/410
+# @name eq_get_2_after_delete
+GET {{baseUrl}}/api/v1/equipment/{{eq2_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Get #2 after delete -> 404/410", () => {
+        client.assert([404,410].includes(response.status), "Expected 404/410");
+    });
+%}
+
+### Delete Equipment #1
+# @name eq_delete_1
+DELETE {{baseUrl}}/api/v1/equipment/{{eq1_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Delete #1 -> 204", () => {
+        client.assert(response.status === 204, "Expected 204");
+    });
+%}
+
+### Verify #1 deleted -> 404/410
+# @name eq_get_1_after_delete
+GET {{baseUrl}}/api/v1/equipment/{{eq1_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("Get #1 after delete -> 404/410", () => {
+        client.assert([404,410].includes(response.status), "Expected 404/410");
+    });
+%}

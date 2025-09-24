@@ -3,6 +3,7 @@ package org.affidtech.musdict.musdictapi.web
 import org.affidtech.musdict.musdictapi.domain.Address
 import org.affidtech.musdict.musdictapi.domain.City
 import org.affidtech.musdict.musdictapi.domain.ConcertVenueProfile
+import org.affidtech.musdict.musdictapi.domain.Equipment
 import org.affidtech.musdict.musdictapi.domain.Location
 import org.affidtech.musdict.musdictapi.domain.RehearsalBaseProfile
 import org.affidtech.musdict.musdictapi.domain.RentalProfile
@@ -125,4 +126,15 @@ interface StudioProfileMapper {
 	
 	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 	fun updateFromPatch(dto: StudioProfilePatchDto, @MappingTarget entity: StudioProfile)
+}
+
+@Mapper(componentModel = "spring")
+interface EquipmentMapper {
+	
+	fun toReadDto(entity: Equipment): EquipmentReadDto
+	
+	fun toEntity(dto: EquipmentCreateDto): Equipment
+	
+	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+	fun updateFromPatch(dto: EquipmentPatchDto, @MappingTarget entity: Equipment)
 }
