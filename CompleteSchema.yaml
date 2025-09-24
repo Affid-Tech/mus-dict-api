@@ -1,0 +1,970 @@
+openapi: 3.1.0
+info:
+  title: Obstanovka API
+  version: 1.0.0
+  description: >
+    Locations with attachable profiles (concert-venue, rental, rehearsal-base, studio),
+    an equipment catalog, and equipment links per profile.
+
+servers:
+  - url: https://api.example.com
+    description: Production
+  - url: http://localhost:8080
+    description: Local
+
+tags:
+  - name: Cities
+  - name: Addresses
+  - name: Locations
+  - name: Concert Venue Profile
+  - name: Rental Profile
+  - name: Rehearsal Base Profile
+  - name: Studio Profile
+  - name: Equipment (Catalog)
+  - name: Concert Venue Equipment
+  - name: Rental Equipment
+
+paths:
+  /api/v1/cities:
+    post:
+      tags: [Cities]
+      summary: Create city
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CityCreate' }
+            examples:
+              default:
+                value: { name: "Luxembourg" }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CityRead' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      tags: [Cities]
+      summary: List cities (paged)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Page of cities
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageCityRead' }
+
+  /api/v1/cities/{id}:
+    delete:
+      tags: [Cities]
+      summary: Delete city
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/addresses:
+    post:
+      tags: [Addresses]
+      summary: Create address
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressCreate' }
+            examples:
+              default:
+                value:
+                  cityId: "11111111-1111-1111-1111-111111111111"
+                  readableAddress: "12 Rue de la Gare, 1611 Luxembourg"
+                  coordinates: { lat: 49.6117, lon: 6.1319 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AddressReadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    get:
+      tags: [Addresses]
+      summary: List addresses (paged)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Page of addresses
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageAddressReadSummary' }
+
+  /api/v1/addresses/{id}:
+    get:
+      tags: [Addresses]
+      summary: Get address by id
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Address
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AddressReadDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Addresses]
+      summary: Delete address
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/locations:
+    post:
+      tags: [Locations]
+      summary: Create location
+      description: Provide exactly one of `addressId` or `addressCreate`.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LocationCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocationReadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    get:
+      tags: [Locations]
+      summary: List locations (paged, filterable)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: cityId
+          schema: { type: string, format: uuid }
+          required: false
+        - in: query
+          name: q
+          description: Full-text name/description query
+          schema: { type: string }
+        - in: query
+          name: nearLat
+          schema: { type: number, format: double }
+        - in: query
+          name: nearLon
+          schema: { type: number, format: double }
+        - in: query
+          name: radiusMeters
+          schema: { type: integer, minimum: 1 }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Page of locations
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageLocationReadSummary' }
+
+  /api/v1/locations/{id}:
+    get:
+      tags: [Locations]
+      summary: Get location by id
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '200':
+          description: Location
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocationReadDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Locations]
+      summary: Update location (shared fields)
+      description: >
+        Patches shared fields only. If you send both `addressId` and `addressCreate` the request is rejected.
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LocationUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocationReadDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Locations]
+      summary: Delete location
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/locations/{id}/concert-venue:
+    get:
+      tags: [Concert Venue Profile]
+      summary: Get concert venue profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ConcertVenueProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Concert Venue Profile]
+      summary: Attach concert venue profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConcertVenueProfileCreateDto' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ConcertVenueProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    patch:
+      tags: [Concert Venue Profile]
+      summary: Update concert venue profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConcertVenueProfilePatchDto' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/ConcertVenueProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Concert Venue Profile]
+      summary: Detach concert venue profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/locations/{id}/rental:
+    get:
+      tags: [Rental Profile]
+      summary: Get rental profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RentalProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Rental Profile]
+      summary: Attach rental profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RentalProfileCreateDto' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/RentalProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    patch:
+      tags: [Rental Profile]
+      summary: Update rental profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RentalProfilePatchDto' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/RentalProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Rental Profile]
+      summary: Detach rental profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/locations/{id}/rehearsal-base:
+    get:
+      tags: [Rehearsal Base Profile]
+      summary: Get rehearsal base profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RehearsalBaseProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Rehearsal Base Profile]
+      summary: Attach rehearsal base profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RehearsalBaseProfileCreateDto' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/RehearsalBaseProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    patch:
+      tags: [Rehearsal Base Profile]
+      summary: Update rehearsal base profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RehearsalBaseProfilePatchDto' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/RehearsalBaseProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Rehearsal Base Profile]
+      summary: Detach rehearsal base profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/locations/{id}/studio:
+    get:
+      tags: [Studio Profile]
+      summary: Get studio profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/StudioProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Studio Profile]
+      summary: Attach studio profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StudioProfileCreateDto' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/StudioProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    patch:
+      tags: [Studio Profile]
+      summary: Update studio profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StudioProfilePatchDto' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/StudioProfileDto' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Studio Profile]
+      summary: Detach studio profile
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/equipment:
+    post:
+      tags: [Equipment (Catalog)]
+      summary: Create equipment
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EquipmentCreateDto' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentReadDto' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      tags: [Equipment (Catalog)]
+      summary: List equipment (paged, optional search)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: q
+          required: false
+          schema: { type: string }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Page of equipment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageEquipmentReadDto' }
+
+  /api/v1/equipment/{id}:
+    get:
+      tags: [Equipment (Catalog)]
+      summary: Get equipment by id
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '200':
+          description: Equipment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentReadDto' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Equipment (Catalog)]
+      summary: Update equipment
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EquipmentPatchDto' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentReadDto' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Equipment (Catalog)]
+      summary: Delete equipment
+      description: Fails with 409 if referenced by any profile equipment link.
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/locations/{id}/concert-venue/equipment:
+    get:
+      tags: [Concert Venue Equipment]
+      summary: List concert venue equipment (links)
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '200':
+          description: List of equipment links
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentLinkReadDto' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Concert Venue Equipment]
+      summary: Replace concert venue equipment collection
+      description: Idempotent; removes absent items, upserts provided ones. Duplicate `equipmentId` is 400.
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/EquipmentLinkUpsertDto' }
+      responses:
+        '200':
+          description: Current collection
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentLinkReadDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Concert Venue Equipment]
+      summary: Add one equipment item
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EquipmentLinkUpsertDto' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentLinkReadDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/locations/{id}/concert-venue/equipment/{equipmentId}:
+    patch:
+      tags: [Concert Venue Equipment]
+      summary: Update quantity of one equipment item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: equipmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EquipmentLinkPatchDto' }
+      responses:
+        '200':
+          description: Updated link
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentLinkReadDto' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Concert Venue Equipment]
+      summary: Remove a single equipment item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: equipmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/locations/{id}/rental/equipment:
+    get:
+      tags: [Rental Equipment]
+      summary: List rental equipment (links)
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      responses:
+        '200':
+          description: List of equipment links
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentLinkReadDto' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Rental Equipment]
+      summary: Replace rental equipment collection
+      description: Idempotent; removes absent items, upserts provided ones. Duplicate `equipmentId` is 400.
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/EquipmentLinkUpsertDto' }
+      responses:
+        '200':
+          description: Current collection
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EquipmentLinkReadDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Rental Equipment]
+      summary: Add one equipment item
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EquipmentLinkUpsertDto' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentLinkReadDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/locations/{id}/rental/equipment/{equipmentId}:
+    patch:
+      tags: [Rental Equipment]
+      summary: Update quantity of one equipment item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: equipmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EquipmentLinkPatchDto' }
+      responses:
+        '200':
+          description: Updated link
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipmentLinkReadDto' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Rental Equipment]
+      summary: Remove a single equipment item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: equipmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: No Content }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0, default: 0 }
+    size:
+      name: size
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+    sort:
+      name: sort
+      in: query
+      description: property[,direction] (e.g. `name,asc`)
+      required: false
+      schema: { type: string }
+
+  responses:
+    NotFound:
+      description: Not Found
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Conflict:
+      description: Conflict
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    BadRequest:
+      description: Bad Request
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  schemas:
+    # ---- Errors
+    ErrorResponse:
+      type: object
+      properties:
+        status: { type: integer, example: 404 }
+        error:  { type: string, example: "Not Found" }
+        message: { type: string, example: "Location not found: 00000000-0000-0000-0000-000000000000" }
+        path:   { type: string, example: "/api/v1/locations/..." }
+        timestamp: { type: string, format: date-time }
+
+    # ---- City
+    CityCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+    CityRead:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+
+    # ---- Address
+    CoordinatesDto:
+      type: object
+      required: [lat, lon]
+      properties:
+        lat: { type: number, format: double, example: 49.6117 }
+        lon: { type: number, format: double, example: 6.1319 }
+    AddressCreate:
+      type: object
+      required: [cityId, readableAddress]
+      properties:
+        cityId: { type: string, format: uuid }
+        readableAddress: { type: string, maxLength: 1000 }
+        coordinates: { $ref: '#/components/schemas/CoordinatesDto' }
+    AddressReadSummary:
+      type: object
+      required: [id, readableAddress, city]
+      properties:
+        id: { type: string, format: uuid }
+        readableAddress: { type: string }
+        city:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+    AddressReadDetail:
+      allOf:
+        - $ref: '#/components/schemas/AddressReadSummary'
+        - type: object
+          properties:
+            coordinates: { $ref: '#/components/schemas/CoordinatesDto' }
+
+    # ---- Location
+    LocationCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        cover: { type: string, maxLength: 1000 }
+        addressId: { type: string, format: uuid, description: 'Exactly one of addressId or addressCreate' }
+        addressCreate: { $ref: '#/components/schemas/AddressCreate' }
+        description: { type: string, maxLength: 5000 }
+        contacts: { type: string, maxLength: 2000 }
+    LocationUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        cover: { type: string, maxLength: 1000 }
+        addressId: { type: string, format: uuid }
+        addressCreate: { $ref: '#/components/schemas/AddressCreate' }
+        description: { type: string, maxLength: 5000 }
+        contacts: { type: string, maxLength: 2000 }
+    LocationReadSummary:
+      type: object
+      required: [id, name, address, types]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        cover: { type: string, nullable: true }
+        address: { $ref: '#/components/schemas/AddressReadSummary' }
+        types:
+          type: array
+          items: { type: string, enum: [CONCERT_VENUE, RENTAL, REHEARSAL_BASE, STUDIO] }
+        links:
+          type: object
+          additionalProperties: { type: string }
+          nullable: true
+    LocationReadDetail:
+      allOf:
+        - $ref: '#/components/schemas/LocationReadSummary'
+        - type: object
+          properties:
+            description: { type: string, nullable: true }
+            contacts: { type: string, nullable: true }
+
+    # ---- Profiles (DTOs)
+    ConcertVenueProfileDto:
+      type: object
+      properties:
+        capacity: { type: integer, minimum: 1, nullable: true }
+        terms: { type: string, maxLength: 5000, nullable: true }
+    ConcertVenueProfileCreateDto:
+      type: object
+      properties:
+        capacity: { type: integer, minimum: 1, nullable: true }
+        terms: { type: string, maxLength: 5000, nullable: true }
+    ConcertVenueProfilePatchDto:
+      type: object
+      properties:
+        capacity: { type: integer, minimum: 1, nullable: true }
+        terms: { type: string, maxLength: 5000, nullable: true }
+
+    RentalProfileDto:
+      type: object
+      description: "No extra fields yet"
+      properties:
+        placeholder: { type: string, nullable: true }
+    RentalProfileCreateDto:
+      type: object
+      properties:
+        placeholder: { type: string, nullable: true }
+    RentalProfilePatchDto:
+      type: object
+      properties:
+        placeholder: { type: string, nullable: true }
+
+    RehearsalBaseProfileDto:
+      type: object
+      properties:
+        placeholder: { type: string, nullable: true }
+    RehearsalBaseProfileCreateDto:
+      type: object
+      properties:
+        placeholder: { type: string, nullable: true }
+    RehearsalBaseProfilePatchDto:
+      type: object
+      properties:
+        placeholder: { type: string, nullable: true }
+
+    StudioProfileDto:
+      type: object
+      properties:
+        placeholder: { type: string, nullable: true }
+    StudioProfileCreateDto:
+      type: object
+      properties:
+        placeholder: { type: string, nullable: true }
+    StudioProfilePatchDto:
+      type: object
+      properties:
+        placeholder: { type: string, nullable: true }
+
+    # ---- Equipment (catalog)
+    EquipmentReadDto:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        cover: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+    EquipmentCreateDto:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        cover: { type: string, maxLength: 1000, nullable: true }
+        description: { type: string, maxLength: 5000, nullable: true }
+    EquipmentPatchDto:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        cover: { type: string, maxLength: 1000, nullable: true }
+        description: { type: string, maxLength: 5000, nullable: true }
+
+    # ---- Equipment links (per profile)
+    EquipmentLinkReadDto:
+      type: object
+      required: [equipmentId, quantity]
+      properties:
+        equipmentId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        equipment:
+          $ref: '#/components/schemas/EquipmentReadDto'
+    EquipmentLinkUpsertDto:
+      type: object
+      required: [equipmentId, quantity]
+      properties:
+        equipmentId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+    EquipmentLinkPatchDto:
+      type: object
+      required: [quantity]
+      properties:
+        quantity: { type: integer, minimum: 1 }
+
+    # ---- Paging wrappers
+    PageCityRead:
+      type: object
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/CityRead' }
+        number: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+      required: [content, number, size, totalElements, totalPages]
+
+    PageAddressReadSummary:
+      type: object
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/AddressReadSummary' }
+        number: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+      required: [content, number, size, totalElements, totalPages]
+
+    PageLocationReadSummary:
+      type: object
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/LocationReadSummary' }
+        number: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+      required: [content, number, size, totalElements, totalPages]
+
+    PageEquipmentReadDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/EquipmentReadDto' }
+        number: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+      required: [content, number, size, totalElements, totalPages]
