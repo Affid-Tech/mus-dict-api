@@ -1,0 +1,305 @@
+### RENTAL: Create City
+# @name rent_equip_createCity
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Luxembourg-RENTAL-EQ" }
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("RENT EQ: Create City -> 201", () => client.assert(response.status === 201));
+    client.global.set("rent_eq_city_id", J(response.body).id);
+%}
+
+### RENTAL: Create Address
+# @name rent_equip_createAddress
+POST {{baseUrl}}/api/v1/addresses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{rent_eq_city_id}}",
+  "readableAddress": "200 Rental Rd, 2000 Luxembourg",
+  "coordinates": { "lat": 49.6122, "lon": 6.1322 }
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("RENT EQ: Create Address -> 201", () => client.assert(response.status === 201));
+    client.global.set("rent_eq_addr_id", J(response.body).id);
+%}
+
+### RENTAL: Create Location
+# @name rent_equip_createLocation
+POST {{baseUrl}}/api/v1/locations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Rental Hub EQ",
+  "addressId": "{{rent_eq_addr_id}}"
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("RENT EQ: Create Location -> 201", () => client.assert(response.status === 201));
+    client.global.set("rent_eq_loc_id", J(response.body).id);
+%}
+
+### RENTAL: Attach rental profile
+# @name rent_equip_attach_profile
+POST {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ }
+
+> {%
+    client.test("RENT EQ: Attach profile -> 201", () => client.assert(response.status === 201));
+%}
+
+### RENTAL: Create Equipment A (catalog)
+# @name rent_equip_create_eqA
+POST {{baseUrl}}/api/v1/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "EQ-RENT-A",
+  "description": "Mixer"
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("RENT EQ: Create equipment A -> 201", () => client.assert(response.status === 201));
+    client.global.set("rent_eq_A_id", J(response.body).id);
+%}
+
+### RENTAL: Create Equipment B (catalog)
+# @name rent_equip_create_eqB
+POST {{baseUrl}}/api/v1/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "EQ-RENT-B",
+  "description": "Monitor"
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("RENT EQ: Create equipment B -> 201", () => client.assert(response.status === 201));
+    client.global.set("rent_eq_B_id", J(response.body).id);
+%}
+
+### RENTAL: List equipment (empty)
+# @name rent_equip_list_empty
+GET {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment
+Authorization: Bearer {{token}}
+
+> {%
+    const arr = (typeof response.body === 'string') ? JSON.parse(response.body) : response.body;
+    client.test("RENT EQ: list empty", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(arr) && arr.length === 0);
+    });
+%}
+
+### RENTAL: Add equipment A
+# @name rent_equip_add_A
+POST {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "equipmentId": "{{rent_eq_A_id}}",
+  "quantity": 3
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("RENT EQ: add A -> 201 & qty=3", () => {
+        client.assert(response.status === 201);
+        client.assert(J(response.body).quantity === 3);
+    });
+%}
+
+### RENTAL: Add equipment A again (conflict)
+# @name rent_equip_add_A_conflict
+POST {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "equipmentId": "{{rent_eq_A_id}}",
+  "quantity": 1
+}
+
+> {%
+    client.test("RENT EQ: duplicate add -> 409", () => client.assert(response.status === 409));
+%}
+
+### RENTAL: Add equipment B
+# @name rent_equip_add_B
+POST {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "equipmentId": "{{rent_eq_B_id}}",
+  "quantity": 7
+}
+
+> {%
+    client.test("RENT EQ: add B -> 201", () => client.assert(response.status === 201));
+%}
+
+### RENTAL: List equipment (A,B)
+# @name rent_equip_list_after_add
+GET {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment
+Authorization: Bearer {{token}}
+
+> {%
+    const arr = (typeof response.body === 'string') ? JSON.parse(response.body) : response.body;
+    client.test("RENT EQ: list -> 200 & length 2", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(arr) && arr.length === 2);
+    });
+%}
+
+### RENTAL: Patch quantity for B (7 -> 9)
+# @name rent_equip_patch_B
+PATCH {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment/{{rent_eq_B_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "quantity": 9 }
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("RENT EQ: patch B -> 200 & qty=9", () => {
+        client.assert(response.status === 200);
+        client.assert(J(response.body).quantity === 9);
+    });
+%}
+
+### RENTAL: PUT replace list (keep B=5 only)
+# @name rent_equip_put_replace
+PUT {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+  { "equipmentId": "{{rent_eq_B_id}}", "quantity": 5 }
+]
+
+> {%
+    const arr = (typeof response.body === 'string') ? JSON.parse(response.body) : response.body;
+    client.test("RENT EQ: replace -> 200 & single B qty=5", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(arr) && arr.length === 1);
+        client.assert(arr[0].equipmentId === client.global.get("rent_eq_B_id"));
+        client.assert(arr[0].quantity === 5);
+    });
+%}
+
+### RENTAL: PUT replace with duplicate equipmentId -> 400
+# @name rent_equip_put_duplicate_ids
+PUT {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+  { "equipmentId": "{{rent_eq_B_id}}", "quantity": 1 },
+  { "equipmentId": "{{rent_eq_B_id}}", "quantity": 2 }
+]
+
+> {%
+    client.test("RENT EQ: replace duplicate -> 400", () => client.assert(response.status === 400));
+%}
+
+### RENTAL: Delete B
+# @name rent_equip_delete_B
+DELETE {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment/{{rent_eq_B_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENT EQ: delete B -> 204", () => client.assert(response.status === 204));
+%}
+
+### RENTAL: Delete B again -> 404
+# @name rent_equip_delete_B_again
+DELETE {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment/{{rent_eq_B_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENT EQ: delete B again -> 404", () => client.assert(response.status === 404));
+%}
+
+### RENTAL: List equipment (empty again)
+# @name rent_equip_list_empty_again
+GET {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental/equipment
+Authorization: Bearer {{token}}
+
+> {%
+    const arr = (typeof response.body === 'string') ? JSON.parse(response.body) : response.body;
+    client.test("RENT EQ: list empty again", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(arr) && arr.length === 0);
+    });
+%}
+
+### RENTAL: Detach rental profile
+# @name rent_equip_detach_profile
+DELETE {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}/rental
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENT EQ: detach profile -> 204", () => client.assert(response.status === 204));
+%}
+
+### RENTAL: Cleanup — delete location
+# @name rent_equip_delete_location
+DELETE {{baseUrl}}/api/v1/locations/{{rent_eq_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENT EQ: delete location -> 204", () => client.assert(response.status === 204));
+%}
+
+### RENTAL: Cleanup — delete address
+# @name rent_equip_delete_address
+DELETE {{baseUrl}}/api/v1/addresses/{{rent_eq_addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENT EQ: delete address -> 204/404", () => client.assert([204,404].includes(response.status)));
+%}
+
+### RENTAL: Cleanup — delete city
+# @name rent_equip_delete_city
+DELETE {{baseUrl}}/api/v1/cities/{{rent_eq_city_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENT EQ: delete city -> 204/404/409", () => client.assert([204,404,409].includes(response.status)));
+%}
+
+### RENTAL: Cleanup — delete catalog equipment A
+# @name rent_equip_delete_eqA
+DELETE {{baseUrl}}/api/v1/equipment/{{rent_eq_A_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENT EQ: delete eq A -> 204", () => client.assert(response.status === 204));
+%}
+
+### RENTAL: Cleanup — delete catalog equipment B
+# @name rent_equip_delete_eqB
+DELETE {{baseUrl}}/api/v1/equipment/{{rent_eq_B_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("RENT EQ: delete eq B -> 204/404", () => client.assert([204,404].includes(response.status)));
+%}

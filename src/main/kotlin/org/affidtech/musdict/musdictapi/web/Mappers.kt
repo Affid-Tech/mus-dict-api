@@ -2,10 +2,12 @@ package org.affidtech.musdict.musdictapi.web
 
 import org.affidtech.musdict.musdictapi.domain.Address
 import org.affidtech.musdict.musdictapi.domain.City
+import org.affidtech.musdict.musdictapi.domain.ConcertVenueEquipment
 import org.affidtech.musdict.musdictapi.domain.ConcertVenueProfile
 import org.affidtech.musdict.musdictapi.domain.Equipment
 import org.affidtech.musdict.musdictapi.domain.Location
 import org.affidtech.musdict.musdictapi.domain.RehearsalBaseProfile
+import org.affidtech.musdict.musdictapi.domain.RentalEquipment
 import org.affidtech.musdict.musdictapi.domain.RentalProfile
 import org.affidtech.musdict.musdictapi.domain.StudioProfile
 import org.affidtech.musdict.musdictapi.web.dto.*
@@ -137,4 +139,20 @@ interface EquipmentMapper {
 	
 	@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 	fun updateFromPatch(dto: EquipmentPatchDto, @MappingTarget entity: Equipment)
+}
+
+@Mapper(componentModel = "spring", uses = [EquipmentMapper::class])
+interface ConcertVenueEquipmentMapper {
+	@Mapping(target = "equipmentId", source = "equipment.id")
+	@Mapping(target = "quantity", source = "quantity")
+	@Mapping(target = "equipment", source = "equipment")
+	fun toReadDto(entity: ConcertVenueEquipment): EquipmentLinkReadDto
+}
+
+@Mapper(componentModel = "spring", uses = [EquipmentMapper::class])
+interface RentalEquipmentMapper {
+	@Mapping(target = "equipmentId", source = "equipment.id")
+	@Mapping(target = "quantity", source = "quantity")
+	@Mapping(target = "equipment", source = "equipment")
+	fun toReadDto(entity: RentalEquipment): EquipmentLinkReadDto
 }

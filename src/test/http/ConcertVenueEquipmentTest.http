@@ -1,0 +1,310 @@
+### CV: Create City
+# @name cv_equip_createCity
+POST {{baseUrl}}/api/v1/cities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Luxembourg-CV-EQ" }
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("CV EQ: Create City -> 201", () => client.assert(response.status === 201));
+    client.global.set("cv_eq_city_id", J(response.body).id);
+%}
+
+### CV: Create Address
+# @name cv_equip_createAddress
+POST {{baseUrl}}/api/v1/addresses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cityId": "{{cv_eq_city_id}}",
+  "readableAddress": "100 Venue St, 1000 Luxembourg",
+  "coordinates": { "lat": 49.6111, "lon": 6.1311 }
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("CV EQ: Create Address -> 201", () => client.assert(response.status === 201));
+    client.global.set("cv_eq_addr_id", J(response.body).id);
+%}
+
+### CV: Create Location
+# @name cv_equip_createLocation
+POST {{baseUrl}}/api/v1/locations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Concert Hall EQ",
+  "addressId": "{{cv_eq_addr_id}}",
+  "description": "Hall for EQ tests"
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("CV EQ: Create Location -> 201", () => client.assert(response.status === 201));
+    client.global.set("cv_eq_loc_id", J(response.body).id);
+%}
+
+### CV: Attach concert-venue profile
+# @name cv_equip_attach_profile
+POST {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "capacity": 500,
+  "terms": "Standard terms"
+}
+
+> {%
+    client.test("CV EQ: Attach profile -> 201", () => client.assert(response.status === 201));
+%}
+
+### CV: Create Equipment A (catalog)
+# @name cv_equip_create_eqA
+POST {{baseUrl}}/api/v1/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "EQ-CV-A",
+  "description": "Line array"
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("CV EQ: Create equipment A -> 201", () => client.assert(response.status === 201));
+    client.global.set("cv_eq_A_id", J(response.body).id);
+%}
+
+### CV: Create Equipment B (catalog)
+# @name cv_equip_create_eqB
+POST {{baseUrl}}/api/v1/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "EQ-CV-B",
+  "description": "Subwoofer"
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("CV EQ: Create equipment B -> 201", () => client.assert(response.status === 201));
+    client.global.set("cv_eq_B_id", J(response.body).id);
+%}
+
+### CV: List equipment (empty)
+# @name cv_equip_list_empty
+GET {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment
+Authorization: Bearer {{token}}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("CV EQ: list empty -> 200 & []", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(J(response.body)));
+        client.assert(J(response.body).length === 0, "expected empty list");
+    });
+%}
+
+### CV: Add equipment A
+# @name cv_equip_add_A
+POST {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "equipmentId": "{{cv_eq_A_id}}",
+  "quantity": 8
+}
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("CV EQ: add A -> 201 & qty=8", () => {
+        client.assert(response.status === 201);
+        client.assert(J(response.body).quantity === 8);
+    });
+%}
+
+### CV: Add equipment A again (conflict)
+# @name cv_equip_add_A_conflict
+POST {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "equipmentId": "{{cv_eq_A_id}}",
+  "quantity": 2
+}
+
+> {%
+    client.test("CV EQ: duplicate add -> 409", () => client.assert(response.status === 409));
+%}
+
+### CV: Add equipment B
+# @name cv_equip_add_B
+POST {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "equipmentId": "{{cv_eq_B_id}}",
+  "quantity": 4
+}
+
+> {%
+    client.test("CV EQ: add B -> 201", () => client.assert(response.status === 201));
+%}
+
+### CV: List equipment (A,B)
+# @name cv_equip_list_after_add
+GET {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment
+Authorization: Bearer {{token}}
+
+> {%
+    const arr = (typeof response.body === 'string') ? JSON.parse(response.body) : response.body;
+    client.test("CV EQ: list -> 200 & length 2", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(arr) && arr.length === 2, "expected two items");
+    });
+%}
+
+### CV: Patch quantity for A (8 -> 12)
+# @name cv_equip_patch_A
+PATCH {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment/{{cv_eq_A_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "quantity": 12 }
+
+> {%
+    const J = b => typeof b === 'string' ? JSON.parse(b) : b;
+    client.test("CV EQ: patch A -> 200 & qty=12", () => {
+        client.assert(response.status === 200);
+        client.assert(J(response.body).quantity === 12);
+    });
+%}
+
+### CV: PUT replace list (keep A=10, drop B, add A only)
+# @name cv_equip_put_replace
+PUT {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+  { "equipmentId": "{{cv_eq_A_id}}", "quantity": 10 }
+]
+
+> {%
+    const arr = (typeof response.body === 'string') ? JSON.parse(response.body) : response.body;
+    client.test("CV EQ: replace -> 200 & single A qty=10", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(arr) && arr.length === 1);
+        client.assert(arr[0].equipmentId === client.global.get("cv_eq_A_id"));
+        client.assert(arr[0].quantity === 10);
+    });
+%}
+
+### CV: PUT replace with duplicate equipmentId -> 400
+# @name cv_equip_put_duplicate_ids
+PUT {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+  { "equipmentId": "{{cv_eq_A_id}}", "quantity": 5 },
+  { "equipmentId": "{{cv_eq_A_id}}", "quantity": 6 }
+]
+
+> {%
+    client.test("CV EQ: replace duplicate -> 400", () => client.assert(response.status === 400));
+%}
+
+### CV: Remove A
+# @name cv_equip_delete_A
+DELETE {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment/{{cv_eq_A_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV EQ: delete A -> 204", () => client.assert(response.status === 204));
+%}
+
+### CV: Remove A again -> 404
+# @name cv_equip_delete_A_again
+DELETE {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment/{{cv_eq_A_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV EQ: delete A again -> 404", () => client.assert(response.status === 404));
+%}
+
+### CV: List equipment (empty again)
+# @name cv_equip_list_empty_again
+GET {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue/equipment
+Authorization: Bearer {{token}}
+
+> {%
+    const arr = (typeof response.body === 'string') ? JSON.parse(response.body) : response.body;
+    client.test("CV EQ: list empty again", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(arr) && arr.length === 0);
+    });
+%}
+
+### CV: Detach concert-venue profile
+# @name cv_equip_detach_profile
+DELETE {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}/concert-venue
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV EQ: detach profile -> 204", () => client.assert(response.status === 204));
+%}
+
+### CV: Cleanup — delete location
+# @name cv_equip_delete_location
+DELETE {{baseUrl}}/api/v1/locations/{{cv_eq_loc_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV EQ: delete location -> 204", () => client.assert(response.status === 204));
+%}
+
+### CV: Cleanup — delete address
+# @name cv_equip_delete_address
+DELETE {{baseUrl}}/api/v1/addresses/{{cv_eq_addr_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV EQ: delete address -> 204/404", () => client.assert([204,404].includes(response.status)));
+%}
+
+### CV: Cleanup — delete city
+# @name cv_equip_delete_city
+DELETE {{baseUrl}}/api/v1/cities/{{cv_eq_city_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV EQ: delete city -> 204/404/409", () => client.assert([204,404,409].includes(response.status)));
+%}
+
+### CV: Cleanup — delete catalog equipment A
+# @name cv_equip_delete_eqA
+DELETE {{baseUrl}}/api/v1/equipment/{{cv_eq_A_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV EQ: delete eq A -> 204", () => client.assert(response.status === 204));
+%}
+
+### CV: Cleanup — delete catalog equipment B
+# @name cv_equip_delete_eqB
+DELETE {{baseUrl}}/api/v1/equipment/{{cv_eq_B_id}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("CV EQ: delete eq B -> 204/404", () => client.assert([204,404].includes(response.status)));
+%}
