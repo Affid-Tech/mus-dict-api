@@ -1,1 +1,1 @@
-rootProject.name = "mus-dict-api"
+rootProject.name = "admin-api"

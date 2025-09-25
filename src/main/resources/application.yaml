@@ -1,5 +1,5 @@
 spring:
-  application.name: mus-dict-api
+  application.name: admin-api
   liquibase:
     change-log: classpath:db/changelog/master.yaml
   servlet:
